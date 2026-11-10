@@ -84,6 +84,19 @@ for c in expected.whiteBar {
     expect(list(light.base) == c.out, "Weißton-Leiste \(c.f) = \(list(light.base)), soll \(c.out)")
 }
 
+// Zustand je Licht: ohne Lichter wirkt alles auf „Alle Lichter“
+light.pick(RGB(1, 2, 3), instant: true)
+expect(light.base == RGB(1, 2, 3) && light.allLook.base == RGB(1, 2, 3), "Farbe für alle Lichter")
+expect(light.power == true, "Farbe wählen schaltet ein")
+light.setBrightness(37)
+expect(light.brightness == 37 && light.allLook.brightness == 37, "Helligkeit für alle Lichter")
+var lookCopy = LightLook()
+lookCopy.base = RGB(9, 8, 7)
+lookCopy.flowID = "aurora"
+let lookData = try JSONEncoder().encode(lookCopy)
+expect((try? JSONDecoder().decode(LightLook.self, from: lookData)) == lookCopy, "Zustand speichern und laden")
+expect(LightController.period(0) == 90 && abs(LightController.period(100) - 3) < 1e-9, "Tempo-Grenzen")
+
 // Befehle an die Leiste
 var effectCodes: [Int] = []
 for c in expected.commands {

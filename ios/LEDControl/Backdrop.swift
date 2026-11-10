@@ -103,22 +103,36 @@ struct ParticleField: View {
 // MARK: - Kopf: Lampe mit Lichtschein in der Farbe, die gerade im Zimmer leuchtet
 
 struct HeroView: View {
+    /// Wessen Farbe die Lampe zeigt
+    var target: Target = .all
+    /// nil = Schriftzug LEDCONTROL, sonst dieser Titel (Name des Lichts)
+    var title: String? = nil
+
     @Environment(LightController.self) private var light
 
     var body: some View {
-        let live = light.live
-        let led = light.led
+        let live = light.isLive(target)
+        let led = light.glow(target)
         VStack(spacing: 14) {
             Bulb(led: led, live: live)
                 .background {
                     SkyGlow(color: led.color, live: live, burst: light.connectedCount)
                 }
-            Wordmark()
+            if let title {
+                Text(title.uppercased())
+                    .font(.geist(26, 700))
+                    .tracking(2)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            } else {
+                Wordmark()
+            }
         }
         .padding(.top, 18)
         .padding(.bottom, 10)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("LED Control")
+        .accessibilityLabel(title ?? "LED Control")
     }
 }
 

@@ -1,26 +1,76 @@
 import SwiftUI
 import UIKit
 
-/// Reiter „Mehr“: Updates, Siri und Kurzbefehle, Protokoll, Info
-struct MoreTab: View {
+/// Einstellungen: Updates, Lichter-Optionen, Siri und Kurzbefehle, Protokoll, Info
+struct SettingsView: View {
     @Environment(Updater.self) private var updater
 
     var body: some View {
-        TabPage {
-            PageTitle(title: "Mehr", subtitle: "Updates, Kurzbefehle und Protokoll")
+        Page {
+            PageTitle(title: "Einstellungen", subtitle: "Updates, Lichter, Kurzbefehle und Protokoll")
             SectionTitle("Updates").rise(1)
             switch updater.source {
             case .sideloaded: UpdatesTile().rise(2)
             case .testFlight: TestFlightTile().rise(2)
             case .appStore: AppStoreTile().rise(2)
             }
-            SectionTitle("Siri & Kurzbefehle").rise(3)
-            ShortcutsTile().rise(4)
-            SectionTitle("Protokoll").rise(5)
-            LogTile().rise(6)
-            AboutTile().rise(7)
-            Footer().rise(8)
+            SectionTitle("Lichter").rise(3)
+            VStack(spacing: 12) {
+                DemoTile()
+                ShowAllTile()
+            }
+            .rise(4)
+            SectionTitle("Siri & Kurzbefehle").rise(5)
+            ShortcutsTile().rise(6)
+            SectionTitle("Protokoll").rise(7)
+            LogTile().rise(8)
+            AboutTile().rise(9)
+            Footer().rise(10)
         }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .pageBackground()
+    }
+}
+
+// MARK: - Lichter
+
+private struct DemoTile: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(get: { light.demo }, set: { light.setDemo($0) })) {
+                Text("Vorführmodus")
+                    .font(.geist(15, 500))
+                    .foregroundStyle(Theme.text)
+            }
+            .tint(Theme.accent)
+            Text("Die App lässt sich dann ohne Licht bedienen, zum Ausprobieren oder Vorführen. Verbundene Lichter steuert sie trotzdem mit.")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+        }
+        .tile()
+    }
+}
+
+private struct ShowAllTile: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        let hub = light.hub
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(get: { hub.showAll }, set: { hub.setShowAll($0) })) {
+                Text("Alle Bluetooth-Geräte zeigen")
+                    .font(.geist(15, 500))
+                    .foregroundStyle(Theme.text)
+            }
+            .tint(Theme.accent)
+            Text("Beim Hinzufügen auch Geräte mit fremdem Namen anzeigen. Die App versucht es dann mit den Befehlen der ELK-Leiste – das klappt nicht bei jedem Gerät.")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+        }
+        .tile()
     }
 }
 

@@ -401,10 +401,10 @@ jobs:
             sleep 8
             xcrun simctl io "$SIM" screenshot "shots/$name.png"
           }
-          shoot 1-licht -screenshotTab light -screenshotFlow aurora
-          shoot 2-effekte -screenshotTab effects -screenshotFlow sunset
-          shoot 3-geraete -screenshotTab devices -screenshotColor FF7A00
-          shoot 4-mehr -screenshotTab more -screenshotColor 00E5FF
+          shoot 1-hauptmenue -screenshotPage home -screenshotFlow aurora
+          shoot 2-farbe -screenshotPage light -screenshotColor 8A2BE2
+          shoot 3-effekte -screenshotPage effects -screenshotFlow sunset
+          shoot 4-szenen -screenshotPage scenes -screenshotFlow ocean
           sips -g pixelWidth -g pixelHeight shots/*.png
 
       - name: Bilder hochladen

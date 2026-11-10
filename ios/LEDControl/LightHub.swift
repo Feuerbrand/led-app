@@ -150,6 +150,16 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         showAll = on
     }
 
+    func light(id: UUID) -> Light? {
+        lights.first { $0.id == id }
+    }
+
+    /// Licht mit eigenem Namen aufnehmen und verbinden
+    func add(_ light: Light, name: String) {
+        light.alias = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        add(light)
+    }
+
     /// Licht in „Meine Lichter“ aufnehmen und verbinden
     func add(_ light: Light) {
         light.saved = true

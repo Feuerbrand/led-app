@@ -52,10 +52,10 @@ enum EffectFamily: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .elk: return "Standard-Effekte der Leiste"
-        case .melk: return "Effekte des MELK-Lichts"
-        case .melkOx: return "Effekte des MELK-Lichts"
-        case .stripX: return "Effekte des MELK-Lichts"
+        case .elk: return "Eingebaut: ELK-Leiste"
+        case .melk: return "Eingebaut: MELK-Licht"
+        case .melkOx: return "Eingebaut: MELK-Licht"
+        case .stripX: return "Lauflichter (eingebaut)"
         }
     }
 
