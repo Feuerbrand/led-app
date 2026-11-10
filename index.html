@@ -34,7 +34,7 @@
 </head>
 <body class="locked">
   <h1>💡 LED Control</h1>
-  <div class="sub">Eigene App für ELK-BLEDOM-Leisten</div>
+  <div class="sub">Eigene App für ELK-BLEDOM-Leisten · v2</div>
 
   <div class="card">
     <div class="row">
@@ -72,11 +72,20 @@
   <div class="card"><div class="log" id="log"></div></div>
 
 <script>
-const SERVICE = 0xfff0, CHAR = 0xfff3;
+// Volle UUID-Strings: Bluefy (iOS) kommt mit den 16-Bit-Kurzformen (0xfff0) nicht zuverlässig klar
+const SERVICE = '0000fff0-0000-1000-8000-00805f9b34fb';
+const CHAR    = '0000fff3-0000-1000-8000-00805f9b34fb';
 let device = null, ch = null, queue = Promise.resolve(), pending = null, busy = false;
 
 const $ = id => document.getElementById(id);
 const log = m => { const l = $('log'); l.textContent = (new Date().toLocaleTimeString() + '  ' + m + '\n' + l.textContent).slice(0, 2000); };
+// Bluefy wirft teils Strings/Objekte ohne .message -> immer etwas Lesbares liefern
+const errText = e => {
+  if (e == null) return 'unbekannter Fehler';
+  let s = e.message || e.name || String(e);
+  if (s === '[object Object]') { try { s = JSON.stringify(e); } catch (_) {} }
+  return s;
+};
 
 // --- ELK-BLEDOM Protokoll ---
 const cmd = {
@@ -94,7 +103,7 @@ async function write(bytes) {
   try {
     if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(data);
     else await ch.writeValue(data);
-  } catch (e) { log('Fehler: ' + e.message); }
+  } catch (e) { log('Fehler: ' + errText(e)); }
 }
 // Schieberegler/Farbrad schicken sehr viele Werte -> nur den neuesten senden
 function send(bytes) {
@@ -114,24 +123,38 @@ function setConnected(ok, name) {
   $('connect').disabled = ok; $('disconnect').disabled = !ok;
 }
 
+// Erst gezielt nach ELK/MELK suchen; klappt das nicht, alle Geräte zur Auswahl anbieten
+async function pickDevice() {
+  try {
+    return await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'ELK' }, { namePrefix: 'MELK' }],
+      optionalServices: [SERVICE]
+    });
+  } catch (e) {
+    log('Suche nach ELK/MELK fehlgeschlagen (' + errText(e) + ') – zeige alle Geräte …');
+    return await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [SERVICE]
+    });
+  }
+}
+
 $('connect').onclick = async () => {
   if (!navigator.bluetooth) {
     log('Dieser Browser kann kein Bluetooth. Auf dem iPhone die App "Bluefy" benutzen, am PC Chrome oder Edge.');
     return;
   }
   try {
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'ELK' }, { namePrefix: 'MELK' }, { services: [SERVICE] }],
-      optionalServices: [SERVICE]
-    });
+    device = await pickDevice();
+    const name = device.name || 'LED-Leiste';
     device.addEventListener('gattserverdisconnected', () => { ch = null; setConnected(false); log('Verbindung getrennt'); });
-    log('Verbinde mit ' + device.name + ' …');
+    log('Verbinde mit ' + name + ' …');
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(SERVICE);
     ch = await svc.getCharacteristic(CHAR);
-    setConnected(true, device.name);
+    setConnected(true, name);
     log('Verbunden ✓');
-  } catch (e) { log('Abgebrochen: ' + e.message); }
+  } catch (e) { log('Abgebrochen: ' + errText(e)); }
 };
 $('disconnect').onclick = () => { if (device?.gatt.connected) device.gatt.disconnect(); };
 
