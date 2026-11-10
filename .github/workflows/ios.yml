@@ -103,14 +103,13 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  release:
-    name: Veröffentlichen
+  # Läuft bei jedem Build: holt die .ipa, erzeugt die AltStore-Quelle und packt alles für die Veröffentlichung.
+  # So ist auch dieser Teil auf jedem Zweig geprüft, nicht erst auf main.
+  prepare:
+    name: Veröffentlichung vorbereiten
     needs: build
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -124,15 +123,15 @@ jobs:
 
       - name: AltStore-Quelle erzeugen
         run: |
+          ls -lR dist
           IPA=$(find dist -name '*.ipa' -type f | head -1)
           test -n "$IPA"
-          cp "$IPA" LEDControl.ipa
-          cp ios/LEDControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png icon.png
-          mkdir -p prev
+          mkdir -p release prev
+          cp "$IPA" release/LEDControl.ipa
+          cp ios/LEDControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png release/icon.png
           gh release download --repo "$GITHUB_REPOSITORY" --pattern altstore.json --dir prev 2>/dev/null || echo "Noch keine frühere Quelle"
           NOTES=$(git log -1 --pretty=%s)
-          python3 ios/scripts/make-source.py --ipa LEDControl.ipa --tag "ios-v$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --previous prev/altstore.json --notes "$NOTES" --out altstore.json
+          python3 ios/scripts/make-source.py --ipa release/LEDControl.ipa --tag "ios-v$VERSION" --repo "$GITHUB_REPOSITORY"             --previous prev/altstore.json --notes "$NOTES" --out release/altstore.json
           {
             echo "LED Control $VERSION"
             echo
@@ -142,10 +141,37 @@ jobs:
             echo
             echo "**AltStore-Quelle für automatische Updates:**"
             echo "\`https://github.com/$GITHUB_REPOSITORY/releases/latest/download/altstore.json\`"
-          } > notes.md
+          } > release/notes.md
+          ls -l release
+          cat release/notes.md
+
+      - name: Dateien für die Veröffentlichung ablegen
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Nur auf main: GitHub-Release anlegen. Darüber holen sich AltStore und die App die Updates.
+  release:
+    name: Veröffentlichen
+    needs: prepare
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dateien holen
+        uses: actions/download-artifact@v8
+        with:
+          name: release-files
+          path: release
 
       - name: Release anlegen
+        working-directory: release
         run: |
-          gh release create "ios-v$VERSION" LEDControl.ipa altstore.json icon.png \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "LED Control $VERSION" --notes-file notes.md --latest
+          gh release create "ios-v$VERSION" LEDControl.ipa altstore.json icon.png             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA"             --title "LED Control $VERSION" --notes-file notes.md --latest

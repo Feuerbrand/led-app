@@ -295,7 +295,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         lights = lights.filter { $0.saved } + lights.filter { !$0.saved }
     }
 
-    private func light(for p: CBPeripheral) -> Light? {
+    private func entry(for p: CBPeripheral) -> Light? {
         lights.first { $0.id == p.identifier }
     }
 
@@ -375,7 +375,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     /// Verbindung ist weg oder kam nicht zustande
     private func linkEnded(_ p: CBPeripheral) {
-        guard let light = light(for: p), light.peripheral === p else { return }
+        guard let light = entry(for: p), light.peripheral === p else { return }
         let was = light.state == .on
         light.session += 1
         light.watchdog?.cancel()
@@ -394,14 +394,15 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
     }
 
-    /// Suchen, solange die Geräteliste offen ist, noch kein Licht gemerkt ist oder ein Licht noch nie gesehen wurde
+    /// Suchen, solange die Geräteliste offen ist, die Leiste beim ersten Start noch gesucht wird
+    /// oder ein eigenes Licht noch nie gesehen wurde
     private func updateScan() {
         guard let central, central.state == .poweredOn else {
             scanning = false
             return
         }
         let missing = mine.contains { $0.enabled && $0.peripheral == nil }
-        let want = browsing || mine.isEmpty || missing
+        let want = browsing || !setupDone || missing
         if want && !scanning {
             central.scanForPeripherals(withServices: nil, options: nil)
             scanning = true
@@ -420,7 +421,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     private func found(_ p: CBPeripheral, name: String?, rssi: Int?) {
-        if let light = light(for: p) {
+        if let light = entry(for: p) {
             if let rssi { light.rssi = rssi } else if light.rssi == nil { light.rssi = -60 }
             if let name, !name.isEmpty, light.name != name {
                 light.name = name
@@ -494,7 +495,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect p: CBPeripheral) {
-        guard let light = light(for: p), light.peripheral === p, light.saved, light.enabled else {
+        guard let light = entry(for: p), light.peripheral === p, light.saved, light.enabled else {
             central.cancelPeripheralConnection(p)
             return
         }
@@ -512,7 +513,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // MARK: - CBPeripheralDelegate
 
     func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let light = light(for: p), light.peripheral === p else { return }
+        guard let light = entry(for: p), light.peripheral === p else { return }
         let services = p.services ?? []
         let wanted = services.filter { $0.uuid == Command.service }
         if wanted.isEmpty && !light.searchedAll {
@@ -530,7 +531,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let light = light(for: p), light.peripheral === p, light.writeChar == nil,
+        guard let light = entry(for: p), light.peripheral === p, light.writeChar == nil,
               let c = service.characteristics?.first(where: { $0.uuid == Command.characteristic }) else { return }
         light.writeChar = c
         light.watchdog?.cancel()
@@ -539,7 +540,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     func peripheral(_ p: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        guard error == nil, let light = light(for: p) else { return }
+        guard error == nil, let light = entry(for: p) else { return }
         light.rssi = RSSI.intValue
     }
 
