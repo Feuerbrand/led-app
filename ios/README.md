@@ -18,7 +18,7 @@ Die App kommt nicht aus dem App Store. GitHub baut sie auf einem Mac in der Clou
 
 1. Auf GitHub anmelden und im Repository oben auf **Actions** gehen.
 2. Links **iOS-App bauen** wählen und den obersten Lauf mit grünem Haken öffnen.
-3. Ganz unten unter **Artifacts** auf **LEDControl.ipa** klicken. Speichert der Browser stattdessen eine `.zip`, diese entpacken – darin liegt die `LEDControl.ipa`.
+3. Ganz unten unter **Artifacts** auf **LEDControl.ipa** klicken. Der Browser speichert direkt die Datei `LEDControl.ipa` (nicht entpacken, auch wenn Windows sie als Archiv anzeigt).
 
 Die Datei bleibt 90 Tage abrufbar. Ist sie abgelaufen oder willst du einen frischen Build: auf der Seite **iOS-App bauen** rechts **Run workflow** drücken und ein paar Minuten warten. Bei jeder Änderung im Ordner `ios/` baut GitHub außerdem automatisch neu.
 

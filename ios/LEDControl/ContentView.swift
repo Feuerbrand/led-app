@@ -54,9 +54,8 @@ struct ContentView: View {
             // Zurück in der App: Verbindung prüfen und wenn nötig neu aufbauen
             if phase == .active { light.resume() }
         }
-        .onChange(of: light.flowID != nil, initial: true) { _, running in
-            // Bildschirm anlassen, solange ein Flow läuft (sonst hält iOS die App an)
-            UIApplication.shared.isIdleTimerDisabled = running
+        .onChange(of: light.keepAwake, initial: true) { _, awake in
+            UIApplication.shared.isIdleTimerDisabled = awake
         }
     }
 }

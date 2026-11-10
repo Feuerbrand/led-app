@@ -36,6 +36,10 @@ final class LightController {
     /// Verbunden und nicht ausgeschaltet -> die Oberfläche leuchtet in der Farbe der Leiste
     var live: Bool { link == .on && power != false }
 
+    /// Bildschirm anlassen, solange ein Flow läuft (sonst hält iOS die App an).
+    /// Nach „Trennen“ darf das iPhone wieder normal schlafen.
+    var keepAwake: Bool { flowID != nil && link != .off }
+
     // MARK: - Intern
 
     private let ble = BLEManager()

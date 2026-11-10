@@ -62,6 +62,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSBluetoothAlwaysUsageDescription' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$APP/Info.plist"
           test -f "$APP/Geist.ttf"
           test -f "$APP/GeistMono.ttf"
           lipo -info "$APP/LEDControl"

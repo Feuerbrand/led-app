@@ -227,37 +227,45 @@ struct AccentSlider: UIViewRepresentable {
 // MARK: - Leisten zum Ziehen (Farbton, Weißton)
 
 /// Unsichtbare Fläche, die beim Antippen und Ziehen die Stelle 0…1 von links nach rechts meldet.
-/// Als UIControl, damit senkrechtes Wischen weiter die Seite scrollt.
+/// Waagerechtes Ziehen gehört der Leiste, senkrechtes Wischen scrollt weiter die Seite.
 struct DragStrip: UIViewRepresentable {
     let onChange: (Double) -> Void
 
-    func makeUIView(context: Context) -> Control {
-        let control = Control()
-        control.onChange = onChange
-        return control
+    func makeUIView(context: Context) -> Surface {
+        let surface = Surface()
+        surface.onChange = onChange
+        return surface
     }
 
-    func updateUIView(_ control: Control, context: Context) {
-        control.onChange = onChange
+    func updateUIView(_ surface: Surface, context: Context) {
+        surface.onChange = onChange
     }
 
-    final class Control: UIControl {
+    final class Surface: UIView {
         var onChange: ((Double) -> Void)?
 
-        override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-            report(touch)
-            return true
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(moved(_:)))
+            pan.maximumNumberOfTouches = 1
+            addGestureRecognizer(pan)
+            addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(moved(_:))))
         }
 
-        override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-            report(touch)
-            return true
+        required init?(coder: NSCoder) {
+            super.init(coder: coder)
         }
 
-        private func report(_ touch: UITouch) {
+        override func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+            let v = pan.velocity(in: self)
+            return abs(v.x) >= abs(v.y)
+        }
+
+        @objc private func moved(_ recognizer: UIGestureRecognizer) {
             let width = bounds.width
             if width <= 0 { return }
-            let f = touch.location(in: self).x / width
+            let f = recognizer.location(in: self).x / width
             onChange?(Double(min(max(f, 0), 1)))
         }
     }
