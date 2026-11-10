@@ -81,13 +81,20 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     /// Klappt es nicht innerhalb von 12 s, startet der nächste Versuch.
     private func attempt() {
         guard wantConnected, let central, central.state == .poweredOn, !isReady else { return }
-        dropLink()
         tries += 1
         searchedAll = false
-        if let p = knownPeripheral(central) {
+        // Ein noch wartender Verbindungsaufbau bleibt bestehen (iOS verbindet, sobald die Leiste auftaucht).
+        // Alles andere – abgerissen oder verbunden, aber ohne Dienst hängen geblieben – wird verworfen.
+        if let old = peripheral, old.state != .connecting {
+            peripheral = nil
+            old.delegate = nil
+            if old.state != .disconnected { central.cancelPeripheralConnection(old) }
+        }
+        if peripheral == nil, let p = knownPeripheral(central) {
             if tries == 1 && !lostLink { onLog("Bekannte Leiste – verbinde automatisch …") }
             link(p, central)
         }
+        central.stopScan()
         central.scanForPeripherals(withServices: nil, options: nil)
         announce()
         schedule(after: 12)
@@ -161,7 +168,8 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
     /// Verbindung ist weg oder kam nicht zustande
     private func linkEnded(_ p: CBPeripheral) {
-        guard p === peripheral else { return }
+        // Meldungen zu einer früheren, inzwischen ersetzten Verbindung nicht beachten
+        guard p === peripheral, p.state == .disconnected else { return }
         let was = isReady
         writeChar = nil
         if was { onLost() }
@@ -217,6 +225,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             return
         }
         central.stopScan()
+        schedule(after: 10)                 // Frist, um Dienst und Merkmal zu finden
         p.discoverServices([Command.service])
     }
 
