@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>LED Control</title>
+<style>
+  :root { --bg:#0e0f13; --card:#1a1c23; --line:#2a2d37; --text:#f2f3f7; --muted:#8b90a0; --accent:#ff3b5c; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.4 -apple-system, system-ui, sans-serif;
+         padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+  h1 { font-size:26px; margin:4px 0 2px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; }
+  .row { display:flex; gap:10px; align-items:center; }
+  button { font:inherit; color:var(--text); background:#262935; border:1px solid var(--line); border-radius:14px;
+           padding:14px 12px; flex:1; cursor:pointer; transition:transform .08s; }
+  button:active { transform:scale(.97); }
+  button.primary { background:var(--accent); border-color:var(--accent); font-weight:600; }
+  button:disabled { opacity:.4; }
+  .status { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); margin-top:10px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#555; }
+  .dot.on { background:#3ddc84; box-shadow:0 0 8px #3ddc84; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em; }
+  input[type=color] { width:100%; height:64px; border:none; border-radius:14px; background:none; padding:0; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  .swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:12px; }
+  .sw { aspect-ratio:1; border-radius:50%; border:2px solid #0000; padding:0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .log { font:12px ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; max-height:90px; overflow:auto; }
+  .locked .needs-conn { opacity:.35; pointer-events:none; }
+</style>
+</head>
+<body class="locked">
+  <h1>💡 LED Control</h1>
+  <div class="sub">Eigene App für ELK-BLEDOM-Leisten</div>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="connect">Verbinden</button>
+      <button id="disconnect" disabled>Trennen</button>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="status">Nicht verbunden</span></div>
+  </div>
+
+  <div class="card needs-conn">
+    <div class="row">
+      <button id="on">An</button>
+      <button id="off">Aus</button>
+    </div>
+  </div>
+
+  <div class="card needs-conn">
+    <label>Farbe</label>
+    <input type="color" id="color" value="#ff0000">
+    <div class="swatches" id="swatches"></div>
+  </div>
+
+  <div class="card needs-conn">
+    <label>Helligkeit <span id="briVal">100</span>%</label>
+    <input type="range" id="bri" min="0" max="100" value="100">
+  </div>
+
+  <div class="card needs-conn">
+    <label>Effekte</label>
+    <div class="grid2" id="effects"></div>
+    <label style="margin-top:14px">Tempo <span id="spdVal">50</span>%</label>
+    <input type="range" id="spd" min="0" max="100" value="50">
+  </div>
+
+  <div class="card"><div class="log" id="log"></div></div>
+
+<script>
+const SERVICE = 0xfff0, CHAR = 0xfff3;
+let device = null, ch = null, queue = Promise.resolve(), pending = null, busy = false;
+
+const $ = id => document.getElementById(id);
+const log = m => { const l = $('log'); l.textContent = (new Date().toLocaleTimeString() + '  ' + m + '\n' + l.textContent).slice(0, 2000); };
+
+// --- ELK-BLEDOM Protokoll ---
+const cmd = {
+  on:     () => [0x7e,0x00,0x04,0xf0,0x00,0x01,0xff,0x00,0xef],
+  off:    () => [0x7e,0x00,0x04,0x00,0x00,0x00,0xff,0x00,0xef],
+  color:  (r,g,b) => [0x7e,0x00,0x05,0x03,r,g,b,0x00,0xef],
+  bright: (p) => [0x7e,0x00,0x01,p,0x00,0x00,0x00,0x00,0xef],
+  effect: (e) => [0x7e,0x00,0x03,e,0x03,0x00,0x00,0x00,0xef],
+  speed:  (s) => [0x7e,0x00,0x02,s,0x00,0x00,0x00,0x00,0xef],
+};
+
+async function write(bytes) {
+  if (!ch) return;
+  const data = new Uint8Array(bytes);
+  try {
+    if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(data);
+    else await ch.writeValue(data);
+  } catch (e) { log('Fehler: ' + e.message); }
+}
+// Schieberegler/Farbrad schicken sehr viele Werte -> nur den neuesten senden
+function send(bytes) {
+  pending = bytes;
+  if (busy) return;
+  busy = true;
+  (async () => {
+    while (pending) { const b = pending; pending = null; await write(b); await new Promise(r => setTimeout(r, 40)); }
+    busy = false;
+  })();
+}
+
+function setConnected(ok, name) {
+  document.body.classList.toggle('locked', !ok);
+  $('dot').classList.toggle('on', ok);
+  $('status').textContent = ok ? 'Verbunden mit ' + name : 'Nicht verbunden';
+  $('connect').disabled = ok; $('disconnect').disabled = !ok;
+}
+
+$('connect').onclick = async () => {
+  if (!navigator.bluetooth) {
+    log('Dieser Browser kann kein Bluetooth. Auf dem iPhone die App "Bluefy" benutzen, am PC Chrome oder Edge.');
+    return;
+  }
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'ELK' }, { namePrefix: 'MELK' }, { services: [SERVICE] }],
+      optionalServices: [SERVICE]
+    });
+    device.addEventListener('gattserverdisconnected', () => { ch = null; setConnected(false); log('Verbindung getrennt'); });
+    log('Verbinde mit ' + device.name + ' …');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SERVICE);
+    ch = await svc.getCharacteristic(CHAR);
+    setConnected(true, device.name);
+    log('Verbunden ✓');
+  } catch (e) { log('Abgebrochen: ' + e.message); }
+};
+$('disconnect').onclick = () => { if (device?.gatt.connected) device.gatt.disconnect(); };
+
+$('on').onclick  = () => send(cmd.on());
+$('off').onclick = () => send(cmd.off());
+
+const hex2rgb = h => [1,3,5].map(i => parseInt(h.substr(i,2),16));
+$('color').oninput = e => send(cmd.color(...hex2rgb(e.target.value)));
+
+['#ff0000','#ff7a00','#ffd400','#00ff40','#00e5ff','#0040ff','#8a2be2','#ff00c8','#ffffff','#ff2a2a','#00ffa2','#ffb3d9']
+  .forEach(c => { const b = document.createElement('button'); b.className='sw'; b.style.background=c;
+    b.onclick = () => { $('color').value = c; send(cmd.color(...hex2rgb(c))); }; $('swatches').appendChild(b); });
+
+$('bri').oninput = e => { $('briVal').textContent = e.target.value; send(cmd.bright(+e.target.value)); };
+$('spd').oninput = e => { $('spdVal').textContent = e.target.value; send(cmd.speed(+e.target.value)); };
+
+[['Springen RGB',0x87],['Springen bunt',0x88],['Überblenden RGB',0x89],['Überblenden bunt',0x8a],
+ ['Effekt 5',0x8b],['Effekt 6',0x8c],['Effekt 7',0x8d],['Blinken bunt',0x95]]
+  .forEach(([n,code]) => { const b = document.createElement('button'); b.textContent = n;
+    b.onclick = () => send(cmd.effect(code)); $('effects').appendChild(b); });
+
+log('Bereit. Lotus Lamp X vorher schließen!');
+</script>
+</body>
+</html>
