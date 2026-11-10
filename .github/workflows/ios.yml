@@ -40,8 +40,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Xcode-Version
-        run: xcodebuild -version
+      # Apple nimmt nur noch Apps an, die mit Xcode 26 (iOS-26-SDK) gebaut sind. Auf dem Mac von GitHub
+      # ist Xcode 26 installiert, aber nicht voreingestellt: die neueste Xcode-26-Version auswählen.
+      - name: Xcode 26 auswählen
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | python3 -c '
+          import re, sys
+          apps = [line.strip() for line in sys.stdin if line.strip()]
+          apps.sort(key=lambda p: [int(n) for n in re.findall(r"\d+", p)])
+          print(apps[-1] if apps else "")
+          ')
+          if [ -z "$XCODE" ]; then echo "::error::Kein Xcode 26 auf diesem Mac gefunden"; exit 1; fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
 
       - name: Logik gegen index.html prüfen
         working-directory: ios
@@ -228,6 +239,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Apple nimmt nur noch Apps an, die mit Xcode 26 (iOS-26-SDK) gebaut sind. Auf dem Mac von GitHub
+      # ist Xcode 26 installiert, aber nicht voreingestellt: die neueste Xcode-26-Version auswählen.
+      - name: Xcode 26 auswählen
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | python3 -c '
+          import re, sys
+          apps = [line.strip() for line in sys.stdin if line.strip()]
+          apps.sort(key=lambda p: [int(n) for n in re.findall(r"\d+", p)])
+          print(apps[-1] if apps else "")
+          ')
+          if [ -z "$XCODE" ]; then echo "::error::Kein Xcode 26 auf diesem Mac gefunden"; exit 1; fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
       - name: Xcode-Projekt erzeugen
         working-directory: ios
         run: |
@@ -286,27 +311,7 @@ jobs:
             -quiet archive
 
       - name: Signieren und zu TestFlight hochladen
-        id: upload
-        continue-on-error: true
         run: |
-          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
-            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-
-      # Falls Apple das nachträgliche Signieren ablehnt: signiert bauen (legt dann ein Entwickler-Zertifikat an)
-      - name: Zweiter Versuch mit signiertem Archiv
-        if: steps.upload.outcome == 'failure'
-        working-directory: ios
-        run: |
-          rm -rf "$RUNNER_TEMP/LEDControl.xcarchive" "$RUNNER_TEMP/export"
-          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
-            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
-            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            -quiet archive
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
@@ -333,6 +338,20 @@ jobs:
       HOMEBREW_NO_INSTALL_CLEANUP: '1'
     steps:
       - uses: actions/checkout@v7
+
+      # Apple nimmt nur noch Apps an, die mit Xcode 26 (iOS-26-SDK) gebaut sind. Auf dem Mac von GitHub
+      # ist Xcode 26 installiert, aber nicht voreingestellt: die neueste Xcode-26-Version auswählen.
+      - name: Xcode 26 auswählen
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | python3 -c '
+          import re, sys
+          apps = [line.strip() for line in sys.stdin if line.strip()]
+          apps.sort(key=lambda p: [int(n) for n in re.findall(r"\d+", p)])
+          print(apps[-1] if apps else "")
+          ')
+          if [ -z "$XCODE" ]; then echo "::error::Kein Xcode 26 auf diesem Mac gefunden"; exit 1; fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
 
       - name: Für den Simulator bauen
         working-directory: ios
