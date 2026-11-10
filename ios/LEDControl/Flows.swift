@@ -7,6 +7,8 @@ struct Flow: Identifiable, Equatable {
         case palette([RGB])
         case breathe
         case candle
+        /// Nur in der App: Helligkeit folgt dem Mikrofon
+        case music
     }
 
     let id: String
@@ -16,8 +18,9 @@ struct Flow: Identifiable, Equatable {
     /// Wie oft der Effekt in einem Durchlauf läuft (`rate` in index.html)
     var rate: Double { kind == .breathe ? 4 : 1 }
 
-    /// Farbe an der Stelle t (0…1) des Durchlaufs. `base` ist die zuletzt gewählte feste Farbe.
-    func color(at t: Double, base: RGB) -> RGB {
+    /// Farbe an der Stelle t (0…1) des Durchlaufs. `base` ist die zuletzt gewählte feste Farbe,
+    /// `level` der Musik-Pegel 0…1 (nur für den Musik-Modus).
+    func color(at t: Double, base: RGB, level: Double = 0) -> RGB {
         switch kind {
         case .rainbow:
             return ColorMath.hsv(t * 360, 1, 1)
@@ -42,6 +45,11 @@ struct Flow: Identifiable, Equatable {
             let green = 118 * v * (0.8 + 0.2 * v)
             let blue = 22 * v * v
             return RGB(ColorMath.jsRound(255 * v), ColorMath.jsRound(green), ColorMath.jsRound(blue))
+
+        case .music:
+            // Die Farbe wandert durch den Regenbogen, die Helligkeit schlägt mit der Musik aus
+            let v = 0.06 + 0.94 * min(max(level, 0), 1)
+            return ColorMath.hsv(t * 360, 1, v)
         }
     }
 
@@ -52,7 +60,7 @@ struct Flow: Identifiable, Equatable {
             return [RGB(255, 0, 0), RGB(255, 255, 0), RGB(0, 255, 0), RGB(0, 255, 255), RGB(0, 0, 255), RGB(255, 0, 255)]
         case .palette(let stops):
             return stops
-        case .breathe, .candle:
+        case .breathe, .candle, .music:
             return []
         }
     }
@@ -72,4 +80,9 @@ struct Flow: Identifiable, Equatable {
         Flow(id: "breathe", name: "Atmen", kind: .breathe),
         Flow(id: "candle", name: "Kerzenschein", kind: .candle),
     ]
+
+    /// Musik-Modus: gibt es nur in der App, nicht auf der Webseite
+    static let music = Flow(id: "music", name: "Musik", kind: .music)
+
+    static let everything: [Flow] = all + [music]
 }

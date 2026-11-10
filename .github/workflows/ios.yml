@@ -1,5 +1,9 @@
 # Baut die iPhone-App aus ios/ auf einem Mac von GitHub und legt sie als LEDControl.ipa ab.
-# Die App ist unsigniert: Sideloadly oder AltStore signieren sie beim Installieren mit der eigenen Apple-ID.
+# Die App ist unsigniert: AltStore oder Sideloadly signieren sie beim Installieren mit der eigenen Apple-ID.
+#
+# Auf main wird jede neue Version zusätzlich als GitHub-Release „ios-v1.1.<Lauf>“ veröffentlicht,
+# samt AltStore-Quelle (altstore.json). Darüber bekommt AltStore die Updates, und die App selbst
+# sieht beim Öffnen nach, ob es eine neuere Version gibt.
 name: iOS-App bauen
 
 on:
@@ -14,7 +18,12 @@ permissions:
 
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  # Auf main nie eine laufende Veröffentlichung abbrechen
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  VERSION: 1.1.${{ github.run_number }}
+  BUILD: ${{ github.run_number }}
 
 jobs:
   build:
@@ -35,23 +44,28 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -O \
             LEDControl/ColorMath.swift LEDControl/Flows.swift LEDControl/Command.swift \
-            LEDControl/SendQueue.swift LEDControl/BLEManager.swift LEDControl/LightController.swift \
+            LEDControl/SendQueue.swift LEDControl/LightHub.swift LEDControl/LightController.swift \
+            LEDControl/Scenes.swift LEDControl/SoundMeter.swift LEDControl/Updater.swift \
             Tests/main.swift -o "$RUNNER_TEMP/check"
           "$RUNNER_TEMP/check" Tests/expected.json
 
       - name: XcodeGen installieren
+        if: ${{ !cancelled() }}        # auch bauen, wenn der Selbsttest scheitert (beide Fehler auf einmal sehen)
         run: brew install xcodegen
 
       - name: Xcode-Projekt erzeugen
+        if: ${{ !cancelled() }}        # auch bauen, wenn der Selbsttest scheitert (beide Fehler auf einmal sehen)
         working-directory: ios
         run: xcodegen generate
 
       - name: App bauen (unsigniert)
+        if: ${{ !cancelled() }}        # auch bauen, wenn der Selbsttest scheitert (beide Fehler auf einmal sehen)
         working-directory: ios
         run: |
           xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
             -quiet build
 
       - name: App prüfen und als .ipa packen
@@ -59,17 +73,26 @@ jobs:
         run: |
           APP=build/Build/Products/Release-iphoneos/LEDControl.app
           test -d "$APP"
-          /usr/libexec/PlistBuddy -c 'Print :NSBluetoothAlwaysUsageDescription' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$APP/Info.plist"
+          for key in CFBundleShortVersionString CFBundleVersion CFBundleIdentifier MinimumOSVersion UIDeviceFamily \
+                     NSBluetoothAlwaysUsageDescription NSMicrophoneUsageDescription CFBundleURLTypes; do
+            echo "$key: $(/usr/libexec/PlistBuddy -c "Print :$key" "$APP/Info.plist" | tr '\n' ' ')"
+          done
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")" = "$VERSION"
           test -f "$APP/Geist.ttf"
           test -f "$APP/GeistMono.ttf"
+          ls "$APP" | grep -i -E "Metadata.appintents|\.car$" || true
           lipo -info "$APP/LEDControl"
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry LEDControl.ipa Payload
           ls -lh LEDControl.ipa
+
+      - name: AltStore-Quelle probeweise erzeugen
+        working-directory: ios
+        run: |
+          python3 scripts/make-source.py --ipa LEDControl.ipa --tag "ios-v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" --out "$RUNNER_TEMP/altstore.json"
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(json.dumps(d['apps'][0]['appPermissions'], ensure_ascii=False))" "$RUNNER_TEMP/altstore.json"
 
       - name: .ipa hochladen
         uses: actions/upload-artifact@v7
@@ -79,3 +102,50 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 90
+
+  release:
+    name: Veröffentlichen
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: .ipa holen
+        uses: actions/download-artifact@v8
+        with:
+          name: LEDControl.ipa
+          path: dist
+
+      - name: AltStore-Quelle erzeugen
+        run: |
+          IPA=$(find dist -name '*.ipa' -type f | head -1)
+          test -n "$IPA"
+          cp "$IPA" LEDControl.ipa
+          cp ios/LEDControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png icon.png
+          mkdir -p prev
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern altstore.json --dir prev 2>/dev/null || echo "Noch keine frühere Quelle"
+          NOTES=$(git log -1 --pretty=%s)
+          python3 ios/scripts/make-source.py --ipa LEDControl.ipa --tag "ios-v$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --previous prev/altstore.json --notes "$NOTES" --out altstore.json
+          {
+            echo "LED Control $VERSION"
+            echo
+            echo "$NOTES"
+            echo
+            echo "**Installieren:** \`LEDControl.ipa\` mit AltStore oder Sideloadly aufs iPhone bringen (Anleitung: \`ios/README.md\`)."
+            echo
+            echo "**AltStore-Quelle für automatische Updates:**"
+            echo "\`https://github.com/$GITHUB_REPOSITORY/releases/latest/download/altstore.json\`"
+          } > notes.md
+
+      - name: Release anlegen
+        run: |
+          gh release create "ios-v$VERSION" LEDControl.ipa altstore.json icon.png \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "LED Control $VERSION" --notes-file notes.md --latest

@@ -2,7 +2,8 @@ import Foundation
 import Observation
 import QuartzCore
 
-/// Zustand der App und die Lichtlogik aus index.html: An/Aus, Farbe, Flow-Effekte, Senden.
+/// Zustand der App und die Lichtlogik aus index.html: An/Aus, Farbe, Flow-Effekte, Tempo.
+/// Dazu Szenen, Musik-Modus und Kurzbefehle. Alles geht an alle verbundenen Lichter zugleich.
 /// Läuft komplett auf dem Hauptthread.
 @Observable
 final class LightController {
@@ -10,10 +11,14 @@ final class LightController {
         case hue, white
     }
 
+    /// Eine Instanz für die ganze App (auch für Siri und Kurzbefehle)
+    static let shared = LightController()
+
+    /// Bluetooth und die Liste der Lichter
+    let hub = LightHub()
+
     // MARK: - Was die Oberfläche anzeigt
 
-    private(set) var link: LinkState = .busy
-    private(set) var status = "Bluetooth startet …"
     private(set) var log = ""
     /// Zählt bei jeder neuen Verbindung hoch (löst den Lichtring aus)
     private(set) var connectedCount = 0
@@ -22,35 +27,50 @@ final class LightController {
     private(set) var power: Bool? = nil
     /// Zuletzt gewählte feste Farbe (Grundfarbe für „Atmen“)
     private(set) var base = RGB(255, 0, 0)
-    /// Farbe der Leiste, wie sie in der Oberfläche leuchtet (gedrosselt nachgeführt)
+    /// Farbe der Lichter, wie sie in der Oberfläche leuchtet (gedrosselt nachgeführt)
     private(set) var led = RGB(255, 210, 63)
     private(set) var flowID: String? = nil
     private(set) var builtin: UInt8? = nil
+    private(set) var builtinFamily: EffectFamily? = nil
     private(set) var swatch: Int? = nil
     private(set) var bar: Bar? = nil
     private(set) var huePos = 0.0
     private(set) var whitePos = 0.0
     private(set) var brightness = 100
     private(set) var speed = 50
+    private(set) var scenes: [LightScene] = []
+    /// Zuletzt gewählte Szene (für die Markierung)
+    private(set) var sceneID: UUID? = nil
 
-    /// Verbunden und nicht ausgeschaltet -> die Oberfläche leuchtet in der Farbe der Leiste
-    var live: Bool { link == .on && power != false }
+    var link: LinkState { hub.summary }
+    var status: String { hub.statusText }
+
+    /// Verbunden und nicht ausgeschaltet -> die Oberfläche leuchtet in der Farbe der Lichter
+    var live: Bool { hub.hasTargets && power != false }
 
     /// Bildschirm anlassen, solange ein Flow läuft (sonst hält iOS die App an).
-    /// Nach „Trennen“ darf das iPhone wieder normal schlafen.
-    var keepAwake: Bool { flowID != nil && link != .off }
+    /// Ist alles getrennt, darf das iPhone wieder normal schlafen.
+    var keepAwake: Bool { flowID != nil && hub.summary != .off }
+
+    /// Vorschlag für den Namen einer neuen Szene
+    var suggestedSceneName: String {
+        if let id = flowID, let flow = Flow.all.first(where: { $0.id == id }) { return flow.name }
+        return "Farbe \(base.hex)"
+    }
 
     // MARK: - Intern
 
-    private let ble = BLEManager()
-    @ObservationIgnored private var queue = SendQueue()
-    @ObservationIgnored private var pumping = false
+    @ObservationIgnored private let meter = SoundMeter()
     @ObservationIgnored private var cur = RGB(255, 0, 0)     // zuletzt ausgegebene Farbe
     @ObservationIgnored private var anim = 0                 // Nummer der laufenden Farb-Animation (Flow oder Überblendung)
     @ObservationIgnored private var phase = 0.0
     @ObservationIgnored private var glowAt = 0.0
+    @ObservationIgnored private var brightnessTouched = false
+    @ObservationIgnored private var pending: [() -> Void] = []   // Kurzbefehl, der auf die Verbindung wartet
 
     private static let whites = [RGB(255, 147, 41), RGB(255, 214, 170), RGB(255, 255, 255), RGB(201, 226, 255)]
+    private static let stateKey = "led-app.state"
+    private static let scenesKey = "led-app.scenes"
 
     private static let clock: DateFormatter = {
         let f = DateFormatter()
@@ -59,29 +79,46 @@ final class LightController {
     }()
 
     init() {
-        ble.onState = { [weak self] state, text in self?.setLink(state, text) }
-        ble.onLog = { [weak self] message in self?.note(message) }
-        ble.onReady = { [weak self] in self?.linkReady() }
-        ble.onLost = { [weak self] in self?.queue.clear() }
+        if let saved = Store.load(SavedState.self, key: Self.stateKey) {
+            brightness = min(max(saved.brightness, 0), 100)
+            speed = min(max(saved.speed, 0), 100)
+            base = RGB(saved.red, saved.green, saved.blue)
+            cur = base
+        }
+        scenes = Store.load([LightScene].self, key: Self.scenesKey) ?? LightScene.starters
+        hub.onLog = { [weak self] message in self?.note(message) }
+        hub.onReady = { [weak self] light in self?.sync(light) }
         note("Bereit. Lotus Lamp X vorher schließen!")
     }
 
     // MARK: - Verbindung
 
-    /// Beim App-Start: Bluetooth einschalten, die Leiste wird dann von selbst gesucht
-    func start() { ble.start() }
-    func connect() { ble.connect() }
-    func disconnect() { ble.disconnect() }
-    func resume() { ble.resume() }
+    /// Beim App-Start: Bluetooth einschalten, die Lichter werden dann von selbst gesucht
+    func start() { hub.start() }
+    func resume() { hub.resume() }
 
-    private func setLink(_ state: LinkState, _ text: String) {
-        if link != state { link = state }
-        if status != text { status = text }
-    }
-
-    private func linkReady() {
-        queue.forgetLast()
+    /// Ein Licht ist frisch verbunden: den aktuellen Zustand übertragen, damit alle Lichter gleich aussehen.
+    /// Solange in der App noch nichts eingestellt wurde, bleibt das Licht, wie es ist.
+    private func sync(_ light: Light) {
         connectedCount += 1
+        if power == false {
+            hub.send(.power(false), to: light)
+        } else {
+            // Die MELK-Anmeldung schaltet das Licht aus -> wieder einschalten
+            if power == true || !light.model.login.isEmpty { hub.send(.power(true), to: light) }
+            if power == true {
+                if brightnessTouched { hub.send(.bright(brightness), to: light) }
+                if let code = builtin, builtinFamily == light.model.family {
+                    hub.send(.effect(code), to: light)
+                } else if flowID == nil {
+                    hub.send(color: cur, to: light)
+                }
+                // Ein laufender Flow erreicht das neue Licht von selbst mit dem nächsten Farbwert
+            }
+        }
+        let jobs = pending
+        pending = []
+        for job in jobs { job() }
     }
 
     private func note(_ message: String) {
@@ -89,41 +126,16 @@ final class LightController {
         log = String((line + log).prefix(2000))
     }
 
-    // MARK: - Senden
-
-    /// Schickt die Warteschlange an die Leiste, mit 28 ms Pause zwischen zwei Paketen (rund 25 pro Sekunde).
-    private func pump() {
-        if pumping { return }
-        pumping = true
-        Task { @MainActor [self] in
-            var stalled = 0
-            while ble.isReady, !queue.isEmpty {
-                if !ble.canSend, stalled < 12 {
-                    // Sendepuffer von iOS ist voll: kurz warten, nichts verwerfen
-                    stalled += 1
-                    try? await Task.sleep(for: .milliseconds(15))
-                    continue
-                }
-                stalled = 0
-                guard let bytes = queue.next() else { continue }
-                ble.write(bytes)
-                try? await Task.sleep(for: .milliseconds(28))
-            }
-            if !ble.isReady { queue.clear() }
-            pumping = false
-        }
+    private func saveState() {
+        Store.save(SavedState(brightness: brightness, speed: speed, red: base.r, green: base.g, blue: base.b), key: Self.stateKey)
     }
 
-    private func sendCtrl(_ key: String, _ bytes: [UInt8]) {
-        queue.control(key, bytes)
-        pump()
-    }
+    // MARK: - Licht
 
-    /// Farbe ausgeben: an die Leiste schicken und in der Oberfläche spiegeln (höchstens alle 80 ms)
+    /// Farbe ausgeben: an die Lichter schicken und in der Oberfläche spiegeln (höchstens alle 80 ms)
     private func show(_ c: RGB, force: Bool = false) {
         cur = c
-        queue.color(c)
-        pump()
+        hub.send(color: c)
         let now = CACurrentMediaTime()
         if force || now - glowAt >= 0.08 {
             glowAt = now
@@ -131,28 +143,30 @@ final class LightController {
         }
     }
 
-    // MARK: - Licht
-
     func setPower(_ on: Bool) {
         power = on
-        sendCtrl("power", on ? Command.on : Command.off)
+        hub.send(.power(on))
     }
 
     func setBrightness(_ percent: Int) {
         brightness = percent
-        sendCtrl("bright", Command.bright(percent))
+        brightnessTouched = true
+        hub.send(.bright(percent))
+        saveState()
     }
 
     func setSpeed(_ percent: Int) {
         speed = percent
         // Flow-Effekte lesen das Tempo direkt, nur die eingebauten Effekte brauchen den Befehl
-        if builtin != nil { sendCtrl("speed", Command.speed(percent)) }
+        if builtin != nil { hub.send(.speed(percent), only: builtinFamily) }
+        saveState()
     }
 
-    /// Laufende Animation beenden, die Leiste bleibt auf der aktuellen Farbe
+    /// Laufende Animation beenden, die Lichter bleiben auf der aktuellen Farbe
     private func halt() {
         anim += 1
         if flowID != nil { flowID = nil }
+        if meter.running { meter.stop() }
     }
 
     /// Weich von der aktuellen zur neuen Farbe
@@ -179,10 +193,13 @@ final class LightController {
     func pick(_ c: RGB, instant: Bool = false, swatch index: Int? = nil, bar which: Bar? = nil) {
         halt()
         builtin = nil
+        builtinFamily = nil
+        sceneID = nil
         swatch = index
         bar = which
         if power != true { setPower(true) }
         base = c
+        saveState()
         if instant {
             show(c, force: true)
         } else {
@@ -218,24 +235,30 @@ final class LightController {
         }
         halt()
         builtin = nil
+        builtinFamily = nil
+        sceneID = nil
         swatch = nil
         bar = nil
         if power != true { setPower(true) }
         flowID = f.id
-        if f.kind == .rainbow { phase = ColorMath.hue(of: cur) / 360 }      // beim aktuellen Farbton einsteigen
+        if f.kind == .rainbow || f.kind == .music { phase = ColorMath.hue(of: cur) / 360 }   // beim aktuellen Farbton einsteigen
         let from = cur
         anim += 1
         let my = anim
         let t0 = CACurrentMediaTime()
+        if f.kind == .music { startListening(my) }
         Task { @MainActor [self] in
             var last = t0
+            var envelope = 0.0
             while my == anim {
                 let now = CACurrentMediaTime()
                 let dt = min(now - last, 0.1)
                 last = now
-                if link == .on, power != false {
+                if hub.hasTargets, power != false {
                     phase = (phase + dt * f.rate / period).truncatingRemainder(dividingBy: 1)
-                    var c = f.color(at: phase, base: base)
+                    // Musik: sofort hochschnellen, langsamer abklingen
+                    envelope = max(meter.level, envelope * 0.86)
+                    var c = f.color(at: phase, base: base, level: envelope)
                     let k = (now - t0) / 0.9                                // Einstieg: 0,9 s von der alten Farbe überblenden
                     if k < 1 { c = ColorMath.mix(from, c, ColorMath.ease(k)) }
                     show(c)
@@ -245,12 +268,134 @@ final class LightController {
         }
     }
 
-    func startBuiltin(_ code: UInt8) {
+    /// Mikrofon für den Musik-Modus einschalten; ohne Erlaubnis hält der Flow wieder an
+    private func startListening(_ my: Int) {
+        meter.start { [weak self] ok in
+            guard let self else { return }
+            if self.anim != my {
+                // Inzwischen wurde etwas anderes gewählt
+                if self.flowID != Flow.music.id { self.meter.stop() }
+                return
+            }
+            if !ok {
+                self.note("Musik-Modus: Mikrofon nicht verfügbar. Erlauben unter Einstellungen → Apps → LED Control → Mikrofon.")
+                self.halt()
+            }
+        }
+    }
+
+    /// Eingebauten Effekt starten. Er geht nur an die Lichter der passenden Bauart.
+    func startBuiltin(_ code: UInt8, family: EffectFamily = .elk) {
         halt()
+        sceneID = nil
         swatch = nil
         bar = nil
         if power != true { setPower(true) }
         builtin = code
-        sendCtrl("effect", Command.effect(code))
+        builtinFamily = family
+        hub.send(.effect(code), only: family)
+    }
+
+    /// Ein Licht kurz blinken lassen, damit man sieht, welches es ist
+    func identify(_ light: Light) {
+        guard light.state == .on else { return }
+        Task { @MainActor [self] in
+            for on in [false, true, false, true] {
+                hub.send(.power(on), to: light)
+                try? await Task.sleep(for: .milliseconds(380))
+            }
+            if power == false { hub.send(.power(false), to: light) }
+        }
+    }
+
+    // MARK: - Szenen
+
+    func apply(_ scene: LightScene) {
+        setBrightness(scene.brightness)
+        setSpeed(scene.speed)
+        if let id = scene.flowID, let flow = Flow.all.first(where: { $0.id == id }) {
+            base = scene.color
+            saveState()
+            if flowID != flow.id { toggleFlow(flow) }        // läuft er schon, nicht anhalten
+        } else {
+            pick(scene.color)
+        }
+        sceneID = scene.id
+    }
+
+    /// Aktuelle Farbe oder laufenden Flow samt Helligkeit und Tempo als Szene speichern
+    func saveScene(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let flow = flowID == Flow.music.id ? nil : flowID
+        let scene = LightScene(name: trimmed.isEmpty ? suggestedSceneName : trimmed, color: base, flowID: flow,
+                               brightness: brightness, speed: speed)
+        scenes.append(scene)
+        sceneID = scene.id
+        Store.save(scenes, key: Self.scenesKey)
+    }
+
+    func deleteScene(_ scene: LightScene) {
+        scenes.removeAll { $0.id == scene.id }
+        if sceneID == scene.id { sceneID = nil }
+        Store.save(scenes, key: Self.scenesKey)
+    }
+
+    // MARK: - Kurzbefehle (ledcontrol://…)
+
+    /// Befehle von außen, z. B. aus der Kurzbefehle-App:
+    /// ledcontrol://on · off · toggle · color?hex=FF7A00 · brightness?value=40 · scene?name=Kino · flow?id=rainbow
+    func handle(url: URL) {
+        guard url.scheme?.lowercased() == "ledcontrol" else { return }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        var values: [String: String] = [:]
+        for item in items { values[item.name.lowercased()] = item.value ?? "" }
+        run((url.host ?? "").lowercased(), values)
+    }
+
+    /// Befehl ausführen; ohne Verbindung wartet er, bis das erste Licht verbunden ist
+    func run(_ action: String, _ values: [String: String] = [:]) {
+        start()
+        guard let job = job(for: action, values) else {
+            note("Kurzbefehl nicht erkannt: \(action)")
+            return
+        }
+        if hub.hasTargets {
+            job()
+        } else {
+            pending = [job]
+            note("Kurzbefehl wartet auf die Verbindung …")
+        }
+    }
+
+    private func job(for action: String, _ values: [String: String]) -> (() -> Void)? {
+        switch action {
+        case "on", "an":
+            return { [weak self] in self?.setPower(true) }
+        case "off", "aus":
+            return { [weak self] in self?.setPower(false) }
+        case "toggle":
+            return { [weak self] in
+                guard let self else { return }
+                self.setPower(self.power != true)
+            }
+        case "color", "farbe":
+            guard let c = RGB(hexString: values["hex"] ?? "") else { return nil }
+            return { [weak self] in self?.pick(c) }
+        case "brightness", "helligkeit":
+            guard let v = Int(values["value"] ?? "") else { return nil }
+            return { [weak self] in self?.setBrightness(min(max(v, 0), 100)) }
+        case "scene", "szene":
+            let name = (values["name"] ?? "").lowercased()
+            guard let scene = scenes.first(where: { $0.name.lowercased() == name }) else { return nil }
+            return { [weak self] in self?.apply(scene) }
+        case "flow", "effekt":
+            guard let flow = Flow.all.first(where: { $0.id == values["id"] }) else { return nil }
+            return { [weak self] in
+                guard let self, self.flowID != flow.id else { return }
+                self.toggleFlow(flow)
+            }
+        default:
+            return nil
+        }
     }
 }

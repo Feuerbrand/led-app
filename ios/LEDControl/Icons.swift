@@ -3,6 +3,7 @@ import SwiftUI
 /// Die Linien-Symbole der Webseite, im selben 24er-Raster wie die SVG-Symbole in index.html.
 enum IconKind {
     case bluetooth, power, moon, sun, drop, speed, list, chevron
+    case lamp, sparkle, sliders, plus, music, download, check, dots, pencil, trash, flash, star
 }
 
 private func pt(_ x: Double, _ y: Double) -> CGPoint {
@@ -75,6 +76,77 @@ struct IconShape: Shape {
 
         case .chevron:
             p.addLines([pt(6, 9), pt(12, 15), pt(18, 9)])
+
+        case .lamp:
+            p.addPath(bulbGlassPath())
+            p.move(to: pt(9.5, 21))
+            p.addLine(to: pt(14.5, 21))
+
+        case .sparkle:
+            p.addLines([pt(11, 3), pt(12.8, 9.2), pt(19, 11), pt(12.8, 12.8), pt(11, 19), pt(9.2, 12.8), pt(3, 11), pt(9.2, 9.2)])
+            p.closeSubpath()
+            p.move(to: pt(19, 15))
+            p.addLine(to: pt(19, 21))
+            p.move(to: pt(16, 18))
+            p.addLine(to: pt(22, 18))
+
+        case .sliders:
+            p.move(to: pt(3, 7))
+            p.addLine(to: pt(21, 7))
+            p.move(to: pt(3, 17))
+            p.addLine(to: pt(21, 17))
+            p.addEllipse(in: CGRect(x: 6.5, y: 4.5, width: 5, height: 5))
+            p.addEllipse(in: CGRect(x: 12.5, y: 14.5, width: 5, height: 5))
+
+        case .plus:
+            p.move(to: pt(12, 5))
+            p.addLine(to: pt(12, 19))
+            p.move(to: pt(5, 12))
+            p.addLine(to: pt(19, 12))
+
+        case .music:
+            p.addLines([pt(9, 18), pt(9, 5), pt(20, 3), pt(20, 16)])
+            p.addEllipse(in: CGRect(x: 3, y: 15, width: 6, height: 6))
+            p.addEllipse(in: CGRect(x: 14, y: 13, width: 6, height: 6))
+
+        case .download:
+            p.move(to: pt(12, 3))
+            p.addLine(to: pt(12, 15))
+            p.addLines([pt(7, 10), pt(12, 15), pt(17, 10)])
+            p.move(to: pt(5, 21))
+            p.addLine(to: pt(19, 21))
+
+        case .check:
+            p.addLines([pt(5, 12.5), pt(10, 17.5), pt(19, 7.5)])
+
+        case .dots:
+            for x in [5.0, 12.0, 19.0] {
+                p.addEllipse(in: CGRect(x: x - 0.6, y: 11.4, width: 1.2, height: 1.2))
+            }
+
+        case .pencil:
+            p.addLines([pt(4, 20), pt(8, 20), pt(19, 9), pt(15, 5), pt(4, 16)])
+            p.closeSubpath()
+
+        case .trash:
+            p.move(to: pt(4, 7))
+            p.addLine(to: pt(20, 7))
+            p.addLines([pt(9, 7), pt(9, 4), pt(15, 4), pt(15, 7)])
+            p.addLines([pt(6, 7), pt(7, 20), pt(17, 20), pt(18, 7)])
+
+        case .flash:
+            p.addLines([pt(13, 2), pt(4, 14), pt(11, 14), pt(10, 22), pt(19, 10), pt(12, 10)])
+            p.closeSubpath()
+
+        case .star:
+            var corners: [CGPoint] = []
+            for i in 0..<10 {
+                let angle = Double(i) * Double.pi / 5 - Double.pi / 2
+                let r = i % 2 == 0 ? 9.5 : 4.2
+                corners.append(pt(12 + r * cos(angle), 12.5 + r * sin(angle)))
+            }
+            p.addLines(corners)
+            p.closeSubpath()
         }
         return fit(p, in: rect)
     }
@@ -95,21 +167,26 @@ struct Icon: View {
     }
 }
 
+/// Umriss des Glaskolbens im 24er-Raster
+private func bulbGlassPath() -> Path {
+    let neck = 55.085        // Winkel, an dem der runde Kolben in den Hals übergeht
+    var p = Path()
+    p.move(to: pt(12, 2))
+    p.addRelativeArc(center: pt(12, 9), radius: 7, startAngle: .degrees(-90), delta: .degrees(-90 - neck))
+    p.addLine(to: pt(8, 17))
+    p.addRelativeArc(center: pt(9, 17), radius: 1, startAngle: .degrees(180), delta: .degrees(-90))
+    p.addLine(to: pt(15, 18))
+    p.addRelativeArc(center: pt(15, 17), radius: 1, startAngle: .degrees(90), delta: .degrees(-90))
+    p.addLine(to: pt(16, 14.74))
+    p.addRelativeArc(center: pt(12, 9), radius: 7, startAngle: .degrees(neck), delta: .degrees(-90 - neck))
+    p.closeSubpath()
+    return p
+}
+
 /// Glaskolben der Lampe
 struct BulbGlass: Shape {
     func path(in rect: CGRect) -> Path {
-        let neck = 55.085        // Winkel, an dem der runde Kolben in den Hals übergeht
-        var p = Path()
-        p.move(to: pt(12, 2))
-        p.addRelativeArc(center: pt(12, 9), radius: 7, startAngle: .degrees(-90), delta: .degrees(-90 - neck))
-        p.addLine(to: pt(8, 17))
-        p.addRelativeArc(center: pt(9, 17), radius: 1, startAngle: .degrees(180), delta: .degrees(-90))
-        p.addLine(to: pt(15, 18))
-        p.addRelativeArc(center: pt(15, 17), radius: 1, startAngle: .degrees(90), delta: .degrees(-90))
-        p.addLine(to: pt(16, 14.74))
-        p.addRelativeArc(center: pt(12, 9), radius: 7, startAngle: .degrees(neck), delta: .degrees(-90 - neck))
-        p.closeSubpath()
-        return fit(p, in: rect)
+        fit(bulbGlassPath(), in: rect)
     }
 }
 

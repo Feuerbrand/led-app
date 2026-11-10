@@ -20,10 +20,27 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>de.feuerbrand.ledcontrol</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ledcontrol</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>altstore</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>LED Control verbindet sich über Bluetooth mit deiner LED-Leiste, um Licht, Farbe und Effekte zu steuern.</string>
+	<string>LED Control verbindet sich über Bluetooth mit deinen Lichtern, um Licht, Farbe und Effekte zu steuern.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Für den Musik-Modus hört LED Control über das Mikrofon mit, wie laut es ist, und lässt die Lichter im Takt leuchten. Es wird nichts aufgenommen oder gespeichert.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Geist.ttf</string>

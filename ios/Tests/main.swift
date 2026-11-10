@@ -122,13 +122,96 @@ for (n, scenario) in expected.queue.enumerated() {
     expect(sent == scenario.out, "Warteschlange \(n + 1): \(sent), soll \(scenario.out)")
 }
 
-// Nur die eigene Leiste, nie der MELK-Controller nebenan
-expect(BLEManager.isStrip("ELK-BLEDDM"), "ELK-BLEDDM muss erkannt werden")
-expect(BLEManager.isStrip("ELK-BLEDOM"), "ELK-BLEDOM muss erkannt werden")
-expect(BLEManager.isStrip("elk-bledom   "), "Kleinschreibung muss erkannt werden")
-expect(!BLEManager.isStrip("MELK-OA10"), "MELK-… darf nicht erkannt werden")
-expect(!BLEManager.isStrip("ELK-BLE"), "ELK-BLE darf nicht erkannt werden")
-expect(!BLEManager.isStrip(nil), "Gerät ohne Namen darf nicht erkannt werden")
+// Bauarten am Namen erkennen. Automatisch übernommen wird nur die eigene ELK-Leiste, nie ein MELK-Licht.
+func model(_ name: String?) -> String { LightModel.detect(name)?.prefix ?? "-" }
+expect(model("ELK-BLEDDM") == "ELK-BLED", "ELK-BLEDDM -> \(model("ELK-BLEDDM"))")
+expect(model("ELK-BLEDOM") == "ELK-BLED", "ELK-BLEDOM -> \(model("ELK-BLEDOM"))")
+expect(model("elk-bledom   ") == "ELK-BLED", "Kleinschreibung -> \(model("elk-bledom   "))")
+expect(model("ELK-BULB2") == "ELK-", "ELK-BULB2 -> \(model("ELK-BULB2"))")
+expect(model("MELK-OA10") == "MELK-OA10", "MELK-OA10 -> \(model("MELK-OA10"))")
+expect(model("melk-og10 ") == "MELK-OG10", "melk-og10 -> \(model("melk-og10 "))")
+expect(model("MELK-OA21") == "MELK-OA21", "MELK-OA21 -> \(model("MELK-OA21"))")
+expect(model("MELK-XYZ") == "MELK", "MELK-XYZ -> \(model("MELK-XYZ"))")
+expect(model("LEDBLE-1234") == "-", "LEDBLE darf nicht erkannt werden")
+expect(model(nil) == "-", "Gerät ohne Namen darf nicht erkannt werden")
+expect(LightModel.detect("ELK-BLEDDM")?.autoAdopt == true, "ELK-Leiste muss automatisch übernommen werden")
+for name in ["MELK-OA10", "MELK", "ELK-BULB", "MELK-OG10"] {
+    expect(LightModel.detect(name)?.autoAdopt == false, "\(name) darf nicht automatisch übernommen werden")
+}
+for m in LightModel.all + [LightModel.generic] {
+    expect(LightModel.find(prefix: m.prefix)?.prefix == m.prefix, "Bauart \(m.prefix) muss wiedergefunden werden")
+}
+
+// Die ELK-Leiste spricht genau die Befehle aus index.html
+let elk = LightModel.elk
+expect(Order.power(true).bytes(for: elk) == Command.on, "ELK an")
+expect(Order.power(false).bytes(for: elk) == Command.off, "ELK aus")
+for v in [0, 1, 37, 100] {
+    expect(Order.bright(v).bytes(for: elk) == Command.bright(v), "ELK Helligkeit \(v)")
+    expect(Order.speed(v).bytes(for: elk) == Command.speed(v), "ELK Tempo \(v)")
+}
+for e in BuiltinEffect.all {
+    expect(Order.effect(e.code).bytes(for: elk) == Command.effect(e.code), "ELK Effekt \(e.code)")
+}
+
+// MELK-Bauarten: Bytes wie in models.json von elkbledom (Wert an Stelle 3)
+struct MelkCase { let prefix: String; let on: [UInt8]; let off: [UInt8]; let bright: [UInt8] }
+let melkCases = [
+    MelkCase(prefix: "MELK", on: [126, 0, 4, 1, 0, 0, 0, 0, 239], off: [126, 0, 4, 0, 0, 0, 255, 0, 239],
+             bright: [126, 4, 1, 55, 255, 0, 255, 0, 239]),
+    MelkCase(prefix: "MELK-OG10", on: [126, 7, 4, 255, 0, 1, 2, 1, 239], off: [126, 7, 4, 0, 0, 0, 2, 0, 239],
+             bright: [126, 4, 1, 55, 255, 0, 255, 0, 239]),
+    MelkCase(prefix: "MELK-OF10", on: [126, 4, 4, 240, 0, 1, 255, 0, 239], off: [126, 4, 4, 0, 0, 0, 255, 0, 239],
+             bright: [126, 4, 1, 55, 1, 255, 255, 0, 239]),
+    MelkCase(prefix: "MELK-OC10", on: [126, 4, 4, 240, 0, 1, 255, 0, 239], off: [126, 4, 4, 0, 0, 0, 255, 0, 239],
+             bright: [126, 4, 1, 55, 1, 255, 255, 0, 239]),
+    MelkCase(prefix: "MELK-OA10", on: [126, 4, 4, 240, 0, 1, 255, 0, 239], off: [126, 4, 4, 0, 0, 0, 255, 0, 239],
+             bright: [126, 4, 1, 55, 1, 255, 255, 0, 239]),
+    MelkCase(prefix: "MELK-OA21", on: [126, 4, 4, 240, 0, 1, 255, 0, 239], off: [126, 4, 4, 0, 0, 0, 255, 0, 239],
+             bright: [126, 4, 1, 55, 1, 255, 255, 0, 239]),
+]
+for c in melkCases {
+    guard let m = LightModel.find(prefix: c.prefix) else {
+        expect(false, "Bauart \(c.prefix) fehlt")
+        continue
+    }
+    expect(m.on == c.on, "\(c.prefix) an = \(m.on)")
+    expect(m.off == c.off, "\(c.prefix) aus = \(m.off)")
+    expect(m.bright(55) == c.bright, "\(c.prefix) Helligkeit = \(m.bright(55))")
+    expect(m.effect(48) == [126, 5, 3, 48, 6, 255, 255, 0, 239], "\(c.prefix) Effekt = \(m.effect(48))")
+    expect(m.speed(70) == [126, 4, 2, 70, 255, 255, 255, 0, 239], "\(c.prefix) Tempo = \(m.speed(70))")
+    expect(m.color(RGB(1, 2, 3)) == [126, 0, 5, 3, 1, 2, 3, 0, 239], "\(c.prefix) Farbe")
+    expect(m.login == [[0x7e, 0x07, 0x83], [0x7e, 0x04, 0x04]], "\(c.prefix) Anmeldung")
+    expect(m.family != .elk, "\(c.prefix) braucht eigene Effekte")
+}
+expect(LightModel.elk.login.isEmpty, "ELK-Leiste braucht keine Anmeldung")
+
+// Jede Bauart hat Effekte mit eindeutigen Nummern
+for family in EffectFamily.allCases {
+    let codes = family.effects.map { $0.code }
+    expect(!codes.isEmpty && Set(codes).count == codes.count, "Effekte \(family) doppelt oder leer")
+}
+
+// Warteschlange mit eigener Farb-Übersetzung je Licht
+var custom = SendQueue(encode: { c in [0xaa, UInt8(c.r)] })
+custom.color(RGB(7, 0, 0))
+expect(custom.next() == [0xaa, 7], "eigene Farb-Übersetzung")
+
+// Kurzbefehl-Farben und Update-Kennungen
+expect(RGB(hexString: "FF7A00") == RGB(255, 122, 0), "Hex FF7A00")
+expect(RGB(hexString: "#00e5ff") == RGB(0, 229, 255), "Hex #00e5ff")
+expect(RGB(hexString: "12345") == nil, "Hex mit 5 Stellen")
+expect(RGB(hexString: "GGGGGG") == nil, "Hex mit Buchstaben")
+let parsed = Updater.parse(tag: "ios-v1.1.42", page: "https://github.com/Feuerbrand/led-app/releases/tag/ios-v1.1.42")
+expect(parsed?.build == 42 && parsed?.version == "1.1.42", "Release-Kennung ios-v1.1.42")
+expect(Updater.parse(tag: "v2", page: "https://x") == nil, "fremde Release-Kennung")
+expect(Updater.addSourceLink.absoluteString.hasPrefix("altstore://source?url=https"), "AltStore-Link \(Updater.addSourceLink)")
+
+// Musik-Modus: leise = fast dunkel, laut = volle Helligkeit, Farbe wandert
+let quiet = Flow.music.color(at: 0, base: RGB(0, 0, 0), level: 0)
+let loud = Flow.music.color(at: 0, base: RGB(0, 0, 0), level: 1)
+expect(quiet.peak < 20 && loud == RGB(255, 0, 0), "Musik leise \(quiet), laut \(loud)")
+expect(Flow.everything.count == Flow.all.count + 1, "Musik-Modus fehlt in der Gesamtliste")
 
 print("\(checks) Prüfungen, \(failures) Fehler")
 exit(failures == 0 ? 0 : 1)

@@ -52,11 +52,20 @@ struct Rise: ViewModifier {
                 if shown { return }
                 if still {
                     shown = true
-                } else {
+                } else if Date().timeIntervalSince(Intro.start) < 2 {
+                    // Beim Start: Kachel für Kachel einblenden
                     withAnimation(Theme.curve.delay(Double(index) * 0.065 + 0.26)) { shown = true }
+                } else {
+                    // Beim Wechsel des Reiters nur kurz und schnell
+                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.45).delay(Double(index) * 0.025)) { shown = true }
                 }
             }
     }
+}
+
+/// Zeitpunkt des App-Starts (für die Einblend-Animation)
+enum Intro {
+    static let start = Date()
 }
 
 extension View {

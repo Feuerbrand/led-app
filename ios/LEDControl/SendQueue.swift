@@ -7,6 +7,12 @@ struct SendQueue {
     private var ctrl: [(key: String, bytes: [UInt8])] = []
     private var frame: RGB?
     private var lastSent: RGB?
+    /// Übersetzt eine Farbe in die Bytes des jeweiligen Lichts
+    private let encode: (RGB) -> [UInt8]
+
+    init(encode: @escaping (RGB) -> [UInt8] = Command.color) {
+        self.encode = encode
+    }
 
     var isEmpty: Bool { ctrl.isEmpty && frame == nil }
 
@@ -34,7 +40,7 @@ struct SendQueue {
         frame = nil
         if f == lastSent { return nil }          // gleiche Farbe nicht doppelt schicken
         lastSent = f
-        return Command.color(f)
+        return encode(f)
     }
 
     /// Nach einer neuen Verbindung: die erste Farbe auf jeden Fall senden

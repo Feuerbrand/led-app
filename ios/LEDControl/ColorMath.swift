@@ -16,6 +16,13 @@ struct RGB: Equatable {
         self.init(Int((hex >> 16) & 0xff), Int((hex >> 8) & 0xff), Int(hex & 0xff))
     }
 
+    /// Aus Text wie „FF7A00“ oder „#ff7a00“
+    init?(hexString: String) {
+        let text = hexString.hasPrefix("#") ? String(hexString.dropFirst()) : hexString
+        guard text.count == 6, let value = UInt32(text, radix: 16) else { return nil }
+        self.init(hex: value)
+    }
+
     /// Hellste der drei Grundfarben
     var peak: Int { max(r, g, b) }
 
