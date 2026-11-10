@@ -1,0 +1,46 @@
+# Beschreibung des Xcode-Projekts für XcodeGen (https://github.com/yonaskolb/XcodeGen).
+# Das eigentliche LEDControl.xcodeproj wird daraus erzeugt und liegt nicht im Repository:
+#   xcodegen generate
+name: LEDControl
+
+options:
+  bundleIdPrefix: de.feuerbrand
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: de
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"          # nur iPhone
+
+targets:
+  LEDControl:
+    type: application
+    platform: iOS
+    sources:
+      - path: LEDControl
+        excludes:
+          - Info.plist                    # wird über INFOPLIST_FILE eingebunden, nicht als Ressource kopiert
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.feuerbrand.ledcontrol
+        PRODUCT_NAME: LEDControl
+        INFOPLIST_FILE: LEDControl/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+
+schemes:
+  LEDControl:
+    build:
+      targets:
+        LEDControl: all
+    run:
+      config: Debug
+    archive:
+      config: Release

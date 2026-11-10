@@ -1,0 +1,80 @@
+# Baut die iPhone-App aus ios/ auf einem Mac von GitHub und legt sie als LEDControl.ipa ab.
+# Die App ist unsigniert: Sideloadly oder AltStore signieren sie beim Installieren mit der eigenen Apple-ID.
+name: iOS-App bauen
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: LEDControl.ipa
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Xcode-Version
+        run: xcodebuild -version
+
+      - name: Logik gegen index.html prüfen
+        working-directory: ios
+        run: |
+          xcrun swiftc -swift-version 5 -O \
+            LEDControl/ColorMath.swift LEDControl/Flows.swift LEDControl/Command.swift \
+            LEDControl/SendQueue.swift LEDControl/BLEManager.swift LEDControl/LightController.swift \
+            Tests/main.swift -o "$RUNNER_TEMP/check"
+          "$RUNNER_TEMP/check" Tests/expected.json
+
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+
+      - name: Xcode-Projekt erzeugen
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: App bauen (unsigniert)
+        working-directory: ios
+        run: |
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            -quiet build
+
+      - name: App prüfen und als .ipa packen
+        working-directory: ios
+        run: |
+          APP=build/Build/Products/Release-iphoneos/LEDControl.app
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :NSBluetoothAlwaysUsageDescription' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          test -f "$APP/Geist.ttf"
+          test -f "$APP/GeistMono.ttf"
+          lipo -info "$APP/LEDControl"
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry LEDControl.ipa Payload
+          ls -lh LEDControl.ipa
+
+      - name: .ipa hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: LEDControl.ipa
+          path: ios/LEDControl.ipa
+          archive: false
+          if-no-files-found: error
+          retention-days: 90
