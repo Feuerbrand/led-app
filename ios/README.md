@@ -92,8 +92,9 @@ Die folgenden Schritte machst du selbst – Anmeldung, Bezahlung und Schlüssel 
 
 - Secrets sind nur für die Builds sichtbar, nicht für Besucher der Seite. Den Schlüssel sonst nirgends weitergeben und die `.p8`-Datei danach sicher aufbewahren oder löschen.
 
-**7. Dich als Tester eintragen**
-- App Store Connect → deine App → **TestFlight** → bei **Interne Tests** auf **+** → Gruppe `Ich` → dich selbst hinzufügen → **Automatische Verteilung** eingeschaltet lassen.
+**7. Testgruppe – macht der Build selbst**
+- Der erste Build legt in App Store Connect unter **TestFlight → Interne Tests** die Gruppe `Ich` an, trägt dich als Tester ein und schaltet die automatische Verteilung ein.
+- Klappt das nicht (steht dann im Lauf beim Schritt „TestFlight-Testgruppe einrichten“), von Hand: App Store Connect → deine App → **TestFlight** → bei **Interne Tests** auf **+** → Gruppe `Ich` → dich selbst hinzufügen.
 
 **8. Ersten Build starten**
 - Oben **Actions** → **iOS-App bauen** → **Run workflow** (oder mir Bescheid sagen, dann stoße ich ihn an). Der Schritt **TestFlight** baut, signiert und lädt hoch; danach verarbeitet Apple die Version noch 10–30 Minuten.

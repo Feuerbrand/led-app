@@ -266,6 +266,14 @@ jobs:
           sed -i '' 's/^          //' "$RUNNER_TEMP/ExportOptions.plist"
           plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
 
+      # Legt die interne Testgruppe an und trägt die Mitglieder des Entwickler-Kontos ein (nur einmal nötig)
+      - name: TestFlight-Testgruppe einrichten
+        continue-on-error: true
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyjwt cryptography
+          "$RUNNER_TEMP/venv/bin/python" ios/scripts/testflight-setup.py de.feuerbrand.ledcontrol
+
       # Erst ohne Signatur bauen und nur beim Export signieren lassen: so legt Xcode nicht bei jedem
       # Lauf ein neues Entwickler-Zertifikat an.
       - name: Archiv bauen (ohne Signatur)
