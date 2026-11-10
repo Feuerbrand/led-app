@@ -4,88 +4,178 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0a07">
 <title>LED Control</title>
 <style>
-  :root { --bg:#0e0f13; --card:#1a1c23; --line:#2a2d37; --text:#f2f3f7; --muted:#8b90a0; --accent:#ff3b5c; }
+  @font-face { font-family:Geist; src:url(fonts/geist-latin.woff2) format('woff2'); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:'Geist Mono'; src:url(fonts/geist-mono-latin.woff2) format('woff2'); font-weight:100 900; font-display:swap; }
+
+  /* Stil wie der PureClient: warmes Schwarz, dünne helle Rahmen, Gelb nur als Akzent */
+  :root {
+    --accent:#FFD23F; --text:#F4F1E8; --muted:rgba(240,236,224,.5); --icon:#E9E3D2;
+    --line:1.5px solid rgba(255,255,255,.6); --soft:1.5px solid rgba(255,255,255,.14);
+    --fill:rgba(10,9,7,.5); --tile:rgba(22,21,16,.92); --hot:rgba(38,31,9,.82);
+  }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.4 -apple-system, system-ui, sans-serif;
-         padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px); }
-  h1 { font-size:26px; margin:4px 0 2px; }
-  .sub { color:var(--muted); font-size:14px; margin-bottom:18px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; }
-  .row { display:flex; gap:10px; align-items:center; }
-  button { font:inherit; color:var(--text); background:#262935; border:1px solid var(--line); border-radius:14px;
-           padding:14px 12px; flex:1; cursor:pointer; transition:transform .08s; }
-  button:active { transform:scale(.97); }
-  button.primary { background:var(--accent); border-color:var(--accent); font-weight:600; }
-  button:disabled { opacity:.4; }
-  .status { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); margin-top:10px; }
-  .dot { width:10px; height:10px; border-radius:50%; background:#555; }
-  .dot.on { background:#3ddc84; box-shadow:0 0 8px #3ddc84; }
-  label { display:block; font-size:13px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em; }
-  input[type=color] { width:100%; height:64px; border:none; border-radius:14px; background:none; padding:0; }
-  input[type=range] { width:100%; accent-color:var(--accent); }
+  html { background:#060504; }
+  body { margin:0; min-height:100vh; color:var(--text); font:500 16px/1.4 Geist, -apple-system, system-ui, sans-serif;
+         padding:calc(env(safe-area-inset-top) + 30px) 16px calc(env(safe-area-inset-bottom) + 28px); }
+  body::before { content:""; position:fixed; inset:0; z-index:-2;
+         background:radial-gradient(ellipse 150% 75% at 50% 30%, #1a1913 0%, #100f0a 50%, #060504 100%); }
+  #parts { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
+  #parts i { position:absolute; border-radius:50%; background:rgb(255,226,140); }
+  main { max-width:520px; margin:0 auto; }
+  svg.ic { fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+  .mark { display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:10px; }
+  .mark svg { width:46px; height:46px; fill:var(--text); }
+  .mark h1 { margin:0; font:700 28px/1 Geist, sans-serif; letter-spacing:.08em; }
+  .mark h1 b, .brand em { font-weight:inherit; font-style:normal; color:var(--accent); }
+  .sub { text-align:center; color:var(--muted); font:400 13px/1.3 Geist, sans-serif; margin-bottom:26px; }
+
+  .sec { font:600 11px/1 Geist, sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:24px 0 10px 4px; }
+  .qt { padding:16px; border:var(--soft); border-radius:8px; background:var(--tile); margin-bottom:12px; }
+  .qh { display:flex; align-items:center; gap:10px; font:500 16px/1 Geist, sans-serif; margin-bottom:14px; white-space:nowrap; }
+  .qh svg { width:17px; height:17px; color:var(--accent); }
+  .qh b { margin-left:auto; font:600 18px/1 Geist, sans-serif; font-variant-numeric:tabular-nums; }
+
+  .row { display:flex; gap:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .ob { flex:1; display:flex; align-items:center; justify-content:center; gap:10px; min-height:46px; padding:6px 12px;
+        background:var(--fill); border:var(--line); border-radius:5px; font:500 16px/1.15 Geist, sans-serif; color:var(--text);
+        cursor:pointer; transition:border-color .12s, background .12s; }
+  .ob svg { width:15px; height:15px; color:var(--icon); }
+  .ob:active, .ob.on { border-color:var(--accent); background:var(--hot); }
+  .ob:active svg, .ob.on svg { color:var(--accent); }
+  @media (hover:hover) {
+    .ob:hover:not(:disabled) { border-color:var(--accent); background:var(--hot); }
+    .ob:hover:not(:disabled) svg { color:var(--accent); }
+  }
+  .ob:disabled { opacity:.35; cursor:default; }
+
+  .status { display:flex; align-items:center; gap:10px; font:400 14px/1.25 Geist, sans-serif; color:var(--muted); margin-bottom:14px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.25); flex:none; }
+  .dot.on { background:var(--accent); box-shadow:0 0 10px rgba(255,210,63,.8); }
+  .dot.busy { background:var(--accent); animation:blink 1s ease-in-out infinite; }
+  .dot.on + span { color:var(--text); }
+  @keyframes blink { 50% { opacity:.25; } }
+
+  input[type=color] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:54px; padding:0;
+        border:var(--line); border-radius:5px; background:none; overflow:hidden; cursor:pointer; }
+  input[type=color]::-webkit-color-swatch-wrapper { padding:0; }
+  input[type=color]::-webkit-color-swatch { border:none; border-radius:0; }
+  input[type=color]::-moz-color-swatch { border:none; border-radius:0; }
   .swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:12px; }
-  .sw { aspect-ratio:1; border-radius:50%; border:2px solid #0000; padding:0; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .log { font:12px ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; max-height:90px; overflow:auto; }
+  .sw { aspect-ratio:1; border-radius:5px; border:1.5px solid rgba(255,255,255,.22); padding:0; cursor:pointer; }
+  .sw.on { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+
+  /* Regler wie in den Client-Einstellungen: gelbe Füllung, heller Knopf mit gelbem Ring */
+  input[type=range] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:28px; margin:0; background:none; --f:.5; cursor:pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px;
+        background:linear-gradient(90deg, var(--accent) calc(10px + (100% - 20px) * var(--f)), rgba(255,255,255,.18) 0); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; box-sizing:border-box; width:20px; height:20px; margin-top:-8px;
+        border-radius:50%; background:#F4F1E8; border:3px solid var(--accent); }
+  input[type=range]::-moz-range-track { height:4px; border-radius:2px; background:rgba(255,255,255,.18); }
+  input[type=range]::-moz-range-progress { height:4px; border-radius:2px; background:var(--accent); }
+  input[type=range]::-moz-range-thumb { box-sizing:border-box; width:20px; height:20px; border-radius:50%; background:#F4F1E8; border:3px solid var(--accent); }
+
+  .log { font:400 12px/1.5 'Geist Mono', ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; max-height:110px; overflow:auto; }
+  .brand { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:26px; font:700 12px/1 Geist, sans-serif; letter-spacing:.08em; }
+  .brand svg { width:16px; height:16px; fill:var(--text); }
+  .brand small { font:400 12px/1 Geist, sans-serif; letter-spacing:0; color:var(--muted); margin-left:2px; }
+  .needs-conn { transition:opacity .2s; }
   .locked .needs-conn { opacity:.35; pointer-events:none; }
 </style>
 </head>
 <body class="locked">
-  <h1>💡 LED Control</h1>
-  <div class="sub">Eigene App für ELK-BLEDOM-Leisten · v2</div>
+<div id="parts"></div>
 
-  <div class="card">
-    <div class="row">
-      <button class="primary" id="connect">Verbinden</button>
-      <button id="disconnect" disabled>Trennen</button>
-    </div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/><path d="M9 19.5h6V21a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M7.05 6.05a7 7 0 1 0 9.9 0"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 6.2 6 10.5a6 6 0 0 1-12 0C6 9.2 12 3 12 3z"/></symbol>
+  <symbol id="i-speed" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-3M10 2h4"/></symbol>
+</svg>
+
+<main>
+  <header class="mark">
+    <svg><use href="#i-bulb"/></svg>
+    <h1>LED<b>CONTROL</b></h1>
+  </header>
+  <div class="sub">Eigene App für ELK-BLEDOM-Leisten · v3</div>
+
+  <div class="sec">Verbindung</div>
+  <div class="qt">
     <div class="status"><span class="dot" id="dot"></span><span id="status">Nicht verbunden</span></div>
-  </div>
-
-  <div class="card needs-conn">
     <div class="row">
-      <button id="on">An</button>
-      <button id="off">Aus</button>
+      <button class="ob on" id="connect"><svg class="ic"><use href="#i-bt"/></svg>Verbinden</button>
+      <button class="ob" id="disconnect" disabled>Trennen</button>
     </div>
   </div>
 
-  <div class="card needs-conn">
-    <label>Farbe</label>
-    <input type="color" id="color" value="#ff0000">
-    <div class="swatches" id="swatches"></div>
-  </div>
+  <div class="needs-conn">
+    <div class="sec">Licht</div>
+    <div class="grid2">
+      <button class="ob" id="on"><svg class="ic"><use href="#i-power"/></svg>An</button>
+      <button class="ob" id="off"><svg class="ic"><use href="#i-moon"/></svg>Aus</button>
+    </div>
+    <div class="qt">
+      <div class="qh"><svg class="ic"><use href="#i-sun"/></svg>Helligkeit<b><span id="briVal">100</span> %</b></div>
+      <input type="range" id="bri" min="0" max="100" value="100" aria-label="Helligkeit">
+    </div>
 
-  <div class="card needs-conn">
-    <label>Helligkeit <span id="briVal">100</span>%</label>
-    <input type="range" id="bri" min="0" max="100" value="100">
-  </div>
+    <div class="sec">Farbe</div>
+    <div class="qt">
+      <div class="qh"><svg class="ic"><use href="#i-drop"/></svg>Farbe<b id="colVal">#FF0000</b></div>
+      <input type="color" id="color" value="#ff0000" aria-label="Farbe wählen">
+      <div class="swatches" id="swatches"></div>
+    </div>
 
-  <div class="card needs-conn">
-    <label>Effekte</label>
+    <div class="sec">Effekte</div>
     <div class="grid2" id="effects"></div>
-    <label style="margin-top:14px">Tempo <span id="spdVal">50</span>%</label>
-    <input type="range" id="spd" min="0" max="100" value="50">
+    <div class="qt">
+      <div class="qh"><svg class="ic"><use href="#i-speed"/></svg>Tempo<b><span id="spdVal">50</span> %</b></div>
+      <input type="range" id="spd" min="0" max="100" value="50" aria-label="Tempo">
+    </div>
   </div>
 
-  <div class="card"><div class="log" id="log"></div></div>
+  <div class="sec">Protokoll</div>
+  <div class="qt"><div class="log" id="log"></div></div>
+
+  <footer class="brand"><svg><use href="#i-bulb"/></svg><span>LED<em>CONTROL</em></span><small>v3</small></footer>
+</main>
 
 <script>
 // Volle UUID-Strings: Bluefy (iOS) kommt mit den 16-Bit-Kurzformen (0xfff0) nicht zuverlässig klar
 const SERVICE = '0000fff0-0000-1000-8000-00805f9b34fb';
 const CHAR    = '0000fff3-0000-1000-8000-00805f9b34fb';
-let device = null, ch = null, queue = Promise.resolve(), pending = null, busy = false;
+// Nur die eigene Leiste (ELK-BLEDOM / ELK-BLEDDM). Andere Controller in Reichweite, z. B. MELK-…, werden nie verbunden.
+const NAME_PREFIX = 'ELK-BLED';
+const STORE = 'led-app.device';
+
+let device = null, ch = null, pending = null, busy = false;
+let wantConnected = false;  // true = Nutzer will verbunden sein -> bei Abbruch automatisch neu verbinden
+let attempt = 0;            // jede neue Aktion (Verbinden, Trennen, Neuverbinden) macht ältere ungültig
+let running = 0;            // Nummer der gerade laufenden Verbindungsaktion, 0 = keine
+let directFails = 0;
 
 const $ = id => document.getElementById(id);
 const log = m => { const l = $('log'); l.textContent = (new Date().toLocaleTimeString() + '  ' + m + '\n' + l.textContent).slice(0, 2000); };
-// Bluefy wirft teils Strings/Objekte ohne .message -> immer etwas Lesbares liefern
+// Bluefy wirft teils Strings/Zahlen/Objekte ohne .message -> immer etwas Lesbares liefern
 const errText = e => {
   if (e == null) return 'unbekannter Fehler';
   let s = e.message || e.name || String(e);
   if (s === '[object Object]') { try { s = JSON.stringify(e); } catch (_) {} }
   return s;
 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Zeitüberschreitung')), ms))]);
+const isStrip = d => String((d && d.name) || '').toUpperCase().startsWith(NAME_PREFIX);
+const saved = () => { try { return JSON.parse(localStorage.getItem(STORE)); } catch (_) { return null; } };
+const remember = d => { try { localStorage.setItem(STORE, JSON.stringify({ id: d.id, name: d.name })); } catch (_) {} };
 
 // --- ELK-BLEDOM Protokoll ---
 const cmd = {
@@ -111,32 +201,83 @@ function send(bytes) {
   if (busy) return;
   busy = true;
   (async () => {
-    while (pending) { const b = pending; pending = null; await write(b); await new Promise(r => setTimeout(r, 40)); }
+    while (pending) { const b = pending; pending = null; await write(b); await sleep(40); }
     busy = false;
   })();
 }
 
-function setConnected(ok, name) {
-  document.body.classList.toggle('locked', !ok);
-  $('dot').classList.toggle('on', ok);
-  $('status').textContent = ok ? 'Verbunden mit ' + name : 'Nicht verbunden';
-  $('connect').disabled = ok; $('disconnect').disabled = !ok;
+// --- Verbindung ---
+// state: 'off' (getrennt), 'busy' (sucht/verbindet), 'on' (verbunden)
+function setState(state, text) {
+  const on = state === 'on';
+  document.body.classList.toggle('locked', !on);
+  $('dot').className = 'dot' + (on ? ' on' : state === 'busy' ? ' busy' : '');
+  $('status').textContent = text;
+  $('connect').disabled = state !== 'off';
+  $('connect').classList.toggle('on', state === 'off');
+  $('disconnect').disabled = state === 'off';
+  $('disconnect').textContent = state === 'busy' ? 'Abbrechen' : 'Trennen';
 }
 
-// Erst gezielt nach ELK/MELK suchen; klappt das nicht, alle Geräte zur Auswahl anbieten
+// Geräteliste des Browsers. Erst nur die ELK-Leiste anbieten; lehnt der Browser Filter ab
+// (Bluefy meldet dann sofort einen Fehler), die allgemeine Liste zeigen.
 async function pickDevice() {
-  try {
-    return await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'ELK' }, { namePrefix: 'MELK' }],
-      optionalServices: [SERVICE]
-    });
-  } catch (e) {
-    log('Suche nach ELK/MELK fehlgeschlagen (' + errText(e) + ') – zeige alle Geräte …');
-    return await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [SERVICE]
-    });
+  const tries = [
+    { filters: [{ namePrefix: NAME_PREFIX }], optionalServices: [SERVICE] },
+    { acceptAllDevices: true, optionalServices: [SERVICE] },
+  ];
+  for (let i = 0; ; i++) {
+    const t0 = Date.now();
+    try { return await navigator.bluetooth.requestDevice(tries[i]); }
+    catch (e) {
+      // Kam der Fehler erst nach einer Weile, war die Liste offen und wurde geschlossen -> keine zweite Liste aufmachen
+      if (i === tries.length - 1 || Date.now() - t0 > 1500) throw e;
+      log('Gefilterte Suche geht in diesem Browser nicht (' + errText(e) + ') – zeige Geräteliste …');
+    }
   }
+}
+
+const hooked = new WeakSet();
+async function openGatt(d, my) {
+  const name = d.name || 'LED-Leiste';
+  if (!hooked.has(d)) { hooked.add(d); d.addEventListener('gattserverdisconnected', onDrop); }
+  const server = await withTimeout(d.gatt.connect(), 15000);
+  const svc = await server.getPrimaryService(SERVICE);
+  const c = await svc.getCharacteristic(CHAR);
+  if (my !== attempt) { try { d.gatt.disconnect(); } catch (_) {} throw new Error('abgebrochen'); }
+  device = d; ch = c; wantConnected = true; directFails = 0;
+  remember(d);
+  setState('on', 'Verbunden mit ' + name);
+  log('Verbunden mit ' + name + ' ✓');
+}
+
+function onDrop() {
+  ch = null;
+  if (running) return;                       // eine laufende Aktion kümmert sich selbst
+  if (!wantConnected) { setState('off', 'Nicht verbunden'); return; }
+  log('Verbindung verloren – verbinde automatisch neu …');
+  reconnect();
+}
+
+// Bricht die Verbindung ungewollt ab, ohne Geräteliste wieder mit derselben Leiste verbinden
+async function reconnect() {
+  if (running || !device) return;
+  const my = running = ++attempt;
+  try {
+    for (let n = 1; n <= 20; n++) {
+      setState('busy', 'Verbinde neu … (Versuch ' + n + ')');
+      try { await openGatt(device, my); return; }
+      catch (e) {
+        if (my !== attempt) return;
+        try { device.gatt.disconnect(); } catch (_) {}
+        await sleep(Math.min(n * 1000, 5000));
+        if (my !== attempt) return;
+      }
+    }
+    wantConnected = false;
+    setState('off', 'Nicht verbunden');
+    log('Neu verbinden hat nicht geklappt – bitte „Verbinden“ tippen.');
+  } finally { if (running === my) running = 0; }
 }
 
 $('connect').onclick = async () => {
@@ -144,39 +285,113 @@ $('connect').onclick = async () => {
     log('Dieser Browser kann kein Bluetooth. Auf dem iPhone die App "Bluefy" benutzen, am PC Chrome oder Edge.');
     return;
   }
+  if (running) return;
+  const my = running = ++attempt;
+  const direct = !!device;                   // Leiste schon bekannt -> ohne Geräteliste direkt verbinden
+  let d = device;
   try {
-    device = await pickDevice();
-    const name = device.name || 'LED-Leiste';
-    device.addEventListener('gattserverdisconnected', () => { ch = null; setConnected(false); log('Verbindung getrennt'); });
-    log('Verbinde mit ' + name + ' …');
-    const server = await device.gatt.connect();
-    const svc = await server.getPrimaryService(SERVICE);
-    ch = await svc.getCharacteristic(CHAR);
-    setConnected(true, name);
-    log('Verbunden ✓');
-  } catch (e) { log('Abgebrochen: ' + errText(e)); }
+    if (!d) {
+      setState('busy', 'Bitte die ELK-Leiste auswählen …');
+      d = await pickDevice();
+      if (my !== attempt) return;
+      if (!isStrip(d)) {
+        setState('off', 'Nicht verbunden');
+        log('„' + (d.name || 'Unbekanntes Gerät') + '“ ist nicht die LED-Leiste. Bitte den Eintrag wählen, der mit ' + NAME_PREFIX + ' beginnt.');
+        return;
+      }
+      device = d;
+    }
+    setState('busy', 'Verbinde mit ' + (d.name || 'LED-Leiste') + ' …');
+    await openGatt(d, my);
+  } catch (e) {
+    if (my !== attempt) return;              // inzwischen abgebrochen
+    try { if (d) d.gatt.disconnect(); } catch (_) {}
+    if (!direct || ++directFails >= 2) { device = null; directFails = 0; }
+    setState('off', 'Nicht verbunden');
+    log('Abgebrochen: ' + errText(e));
+  } finally { if (running === my) running = 0; }
 };
-$('disconnect').onclick = () => { if (device?.gatt.connected) device.gatt.disconnect(); };
 
-$('on').onclick  = () => send(cmd.on());
-$('off').onclick = () => send(cmd.off());
+$('disconnect').onclick = () => {
+  const was = !!ch;
+  wantConnected = false; attempt++; running = 0; ch = null;
+  try { if (device) device.gatt.disconnect(); } catch (_) {}
+  setState('off', 'Nicht verbunden');
+  log(was ? 'Verbindung getrennt' : 'Abgebrochen');
+};
+
+// Kennt der Browser die Leiste schon (Freigabe von früher), beim Öffnen der Seite ohne Tippen verbinden
+async function autoConnect() {
+  if (!navigator.bluetooth || !navigator.bluetooth.getDevices || running) return;
+  let list;
+  try { list = await navigator.bluetooth.getDevices(); } catch (_) { return; }
+  const s = saved();
+  const d = (list || []).find(x => s && x.id === s.id) || (list || []).find(isStrip);
+  if (!d || running) return;
+  const my = running = ++attempt;
+  log('Bekannte Leiste gefunden – verbinde automatisch …');
+  setState('busy', 'Verbinde automatisch …');
+  try { device = d; await openGatt(d, my); }
+  catch (e) {
+    if (my !== attempt) return;
+    try { d.gatt.disconnect(); } catch (_) {}
+    device = null;
+    setState('off', 'Nicht verbunden');
+    log('Automatisch verbinden ging nicht (' + errText(e) + ') – bitte „Verbinden“ tippen.');
+  } finally { if (running === my) running = 0; }
+}
+
+// Nach dem Zurückwechseln in den Browser prüfen, ob die Verbindung noch steht
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && wantConnected && device && !device.gatt.connected && !running) {
+    ch = null;
+    log('Verbindung verloren – verbinde automatisch neu …');
+    reconnect();
+  }
+});
+
+// --- Bedienung ---
+const setPower = on => { send(on ? cmd.on() : cmd.off()); $('on').classList.toggle('on', on); $('off').classList.toggle('on', !on); };
+$('on').onclick  = () => setPower(true);
+$('off').onclick = () => setPower(false);
 
 const hex2rgb = h => [1,3,5].map(i => parseInt(h.substr(i,2),16));
-$('color').oninput = e => send(cmd.color(...hex2rgb(e.target.value)));
+const clearMarks = sel => document.querySelectorAll(sel).forEach(b => b.classList.remove('on'));
+function setColor(hex, swatch) {
+  send(cmd.color(...hex2rgb(hex)));
+  $('colVal').textContent = hex.toUpperCase();
+  clearMarks('.sw.on, #effects .on');
+  if (swatch) swatch.classList.add('on');
+}
+$('color').oninput = e => setColor(e.target.value);
 
 ['#ff0000','#ff7a00','#ffd400','#00ff40','#00e5ff','#0040ff','#8a2be2','#ff00c8','#ffffff','#ff2a2a','#00ffa2','#ffb3d9']
-  .forEach(c => { const b = document.createElement('button'); b.className='sw'; b.style.background=c;
-    b.onclick = () => { $('color').value = c; send(cmd.color(...hex2rgb(c))); }; $('swatches').appendChild(b); });
+  .forEach(c => { const b = document.createElement('button'); b.className = 'sw'; b.style.background = c; b.setAttribute('aria-label', 'Farbe ' + c);
+    b.onclick = () => { $('color').value = c; setColor(c, b); }; $('swatches').appendChild(b); });
 
-$('bri').oninput = e => { $('briVal').textContent = e.target.value; send(cmd.bright(+e.target.value)); };
-$('spd').oninput = e => { $('spdVal').textContent = e.target.value; send(cmd.speed(+e.target.value)); };
+const fillRange = el => el.style.setProperty('--f', (el.value - el.min) / (el.max - el.min));
+$('bri').oninput = e => { $('briVal').textContent = e.target.value; fillRange(e.target); send(cmd.bright(+e.target.value)); };
+$('spd').oninput = e => { $('spdVal').textContent = e.target.value; fillRange(e.target); send(cmd.speed(+e.target.value)); };
+fillRange($('bri')); fillRange($('spd'));
 
 [['Springen RGB',0x87],['Springen bunt',0x88],['Überblenden RGB',0x89],['Überblenden bunt',0x8a],
  ['Effekt 5',0x8b],['Effekt 6',0x8c],['Effekt 7',0x8d],['Blinken bunt',0x95]]
-  .forEach(([n,code]) => { const b = document.createElement('button'); b.textContent = n;
-    b.onclick = () => send(cmd.effect(code)); $('effects').appendChild(b); });
+  .forEach(([n,code]) => { const b = document.createElement('button'); b.className = 'ob'; b.textContent = n;
+    b.onclick = () => { send(cmd.effect(code)); clearMarks('.sw.on, #effects .on'); b.classList.add('on'); }; $('effects').appendChild(b); });
+
+// Weiche Lichtpunkte im Hintergrund (feste Zufallsfolge, damit es bei jedem Laden gleich aussieht)
+(() => {
+  let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('i'), soft = rnd() < .3, size = soft ? 12 + rnd() * 14 : 2 + rnd() * 4;
+    p.style.cssText = 'left:' + (rnd() * 100).toFixed(1) + '%;top:' + (rnd() * 100).toFixed(1) + '%;width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) +
+      'px;opacity:' + (soft ? .05 + rnd() * .07 : .2 + rnd() * .4).toFixed(2) + (soft ? ';filter:blur(6px)' : '');
+    $('parts').appendChild(p);
+  }
+})();
 
 log('Bereit. Lotus Lamp X vorher schließen!');
+autoConnect();
 </script>
 </body>
 </html>
