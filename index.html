@@ -9,42 +9,96 @@
 <style>
   @font-face { font-family:Geist; src:url(fonts/geist-latin.woff2) format('woff2'); font-weight:100 900; font-display:swap; }
   @font-face { font-family:'Geist Mono'; src:url(fonts/geist-mono-latin.woff2) format('woff2'); font-weight:100 900; font-display:swap; }
+  @property --a { syntax:'<angle>'; inherits:false; initial-value:0deg; }
 
-  /* Stil wie der PureClient: warmes Schwarz, dünne helle Rahmen, Gelb nur als Akzent */
+  /* Stil wie der PureClient: warmes Schwarz, dünne helle Rahmen, Gelb nur als Akzent.
+     Dazu scheint die aktuelle Farbe der Leiste (--led) live in die Seite. */
   :root {
     --accent:#FFD23F; --text:#F4F1E8; --muted:rgba(240,236,224,.5); --icon:#E9E3D2;
     --line:1.5px solid rgba(255,255,255,.6); --soft:1.5px solid rgba(255,255,255,.14);
-    --fill:rgba(10,9,7,.5); --tile:rgba(22,21,16,.92); --hot:rgba(38,31,9,.82);
+    --fill:rgba(10,9,7,.5); --tile:rgba(22,21,16,.9); --hot:rgba(38,31,9,.82);
+    --led:255 210 63; --pick:255 0 0;
+    --ease:cubic-bezier(.2,.8,.2,1);
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html { background:#060504; }
+  html { background:#060504; overflow-x:hidden; }
   body { margin:0; min-height:100vh; color:var(--text); font:500 16px/1.4 Geist, -apple-system, system-ui, sans-serif;
-         padding:calc(env(safe-area-inset-top) + 30px) 16px calc(env(safe-area-inset-bottom) + 28px); }
+         padding:calc(env(safe-area-inset-top) + 22px) 16px calc(env(safe-area-inset-bottom) + 28px);
+         -webkit-user-select:none; user-select:none; }
   body::before { content:""; position:fixed; inset:0; z-index:-2;
          background:radial-gradient(ellipse 150% 75% at 50% 30%, #1a1913 0%, #100f0a 50%, #060504 100%); }
-  #parts { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
-  #parts i { position:absolute; border-radius:50%; background:rgb(255,226,140); }
   main { max-width:520px; margin:0 auto; }
+  button { touch-action:manipulation; }
   svg.ic { fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
 
-  .mark { display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:10px; }
-  .mark svg { width:46px; height:46px; fill:var(--text); }
-  .mark h1 { margin:0; font:700 28px/1 Geist, sans-serif; letter-spacing:.08em; }
-  .mark h1 b, .brand em { font-weight:inherit; font-style:normal; color:var(--accent); }
-  .sub { text-align:center; color:var(--muted); font:400 13px/1.3 Geist, sans-serif; margin-bottom:26px; }
+  /* Schwebende Lichtpunkte, nehmen die Farbe der Leiste an */
+  #parts { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
+  #parts i { position:absolute; border-radius:50%; background:rgb(255 226 140); opacity:0;
+         animation:drift var(--d) linear infinite; animation-delay:var(--dl); will-change:transform, opacity; }
+  body.live #parts i { background:rgb(var(--led)); }
+  @keyframes drift { 0% { transform:translate3d(0,0,0); opacity:0; } 12%, 85% { opacity:var(--o); }
+         100% { transform:translate3d(var(--dx), -140px, 0); opacity:0; } }
+
+  /* Kopf: Lampe mit Lichtschein in der Farbe, die gerade im Zimmer leuchtet */
+  .hero { position:relative; display:flex; flex-direction:column; align-items:center; gap:14px; padding-top:18px; margin-bottom:10px; }
+  .sky { position:absolute; left:50%; top:-240px; width:100vw; height:640px; margin-left:-50vw; overflow:hidden; pointer-events:none; z-index:-1; }
+  .sky > * { position:absolute; left:50%; top:287px; border-radius:50%; }
+  .wash { width:900px; height:640px; margin:-320px -450px; opacity:.35; transition:opacity 1s;
+         background:radial-gradient(ellipse, rgb(var(--led) / .11), transparent 66%); }
+  .rays { width:440px; height:440px; margin:-220px; opacity:0; transition:opacity 1.4s; animation:spin 80s linear infinite;
+         background:repeating-conic-gradient(from 0deg, rgb(var(--led) / .12) 0 5deg, transparent 5deg 20deg);
+         -webkit-mask:radial-gradient(circle, #000 8%, transparent 62%); mask:radial-gradient(circle, #000 8%, transparent 62%); }
+  .halo { width:340px; height:340px; margin:-170px; opacity:.28; transition:opacity 1s; animation:breath 5.5s ease-in-out infinite;
+         background:radial-gradient(circle, rgb(var(--led) / .36) 0%, rgb(var(--led) / .12) 36%, transparent 68%); }
+  .burst { width:120px; height:120px; margin:-60px; border:2px solid var(--accent); opacity:0; }
+  .burst.go { animation:burst 1s ease-out; }
+  body.live .wash, body.live .rays, body.live .halo { opacity:1; }
+  .bulb { width:58px; height:58px; overflow:visible; transition:filter .6s; }
+  .bulb .glass { fill:rgba(244,241,232,.88); transition:fill .6s; }
+  .bulb .base { fill:var(--icon); }
+  body.live .bulb { filter:drop-shadow(0 0 12px rgb(var(--led) / .95)) drop-shadow(0 0 38px rgb(var(--led) / .55)); }
+  body.live .bulb .glass { fill:rgb(var(--led)); fill:color-mix(in srgb, rgb(var(--led)) 62%, #fff); transition:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes breath { 0%, 100% { transform:scale(.92); } 50% { transform:scale(1.08); } }
+  @keyframes burst { from { transform:scale(.4); opacity:.9; } to { transform:scale(4.2); opacity:0; } }
+
+  .word { display:flex; margin:0; padding-bottom:2px; overflow:hidden; font:700 28px/1.1 Geist, sans-serif; letter-spacing:.08em; }
+  .word b { display:flex; font-weight:inherit; color:var(--accent); }
+  .word span { display:inline-block; animation:letter .75s var(--ease) both; animation-delay:calc(var(--i) * 45ms + 120ms); }
+  @keyframes letter { from { transform:translateY(115%) rotate(9deg); opacity:0; } }
+  .sub { text-align:center; color:var(--muted); font:400 13px/1.3 Geist, sans-serif; margin-bottom:26px; animation:fade 1s .7s both; }
+  @keyframes fade { from { opacity:0; } }
+  .brand em { font-style:normal; color:var(--accent); }
+
+  /* Einblenden beim Laden und Aufwachen nach dem Verbinden */
+  .rise { animation:rise .7s var(--ease) both; animation-delay:calc(var(--i) * 65ms + 260ms); }
+  @keyframes rise { from { opacity:0; transform:translateY(18px) scale(.98); } }
+  body.justOn .needs-conn > * { animation:wake .8s var(--ease) both; animation-delay:calc(var(--j) * 55ms); }
+  @keyframes wake { 0% { opacity:.15; transform:translateY(10px); filter:brightness(1.9); } 100% { opacity:1; transform:none; filter:none; } }
 
   .sec { font:600 11px/1 Geist, sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:24px 0 10px 4px; }
-  .qt { padding:16px; border:var(--soft); border-radius:8px; background:var(--tile); margin-bottom:12px; }
+  .qt { position:relative; padding:16px; border:var(--soft); border-radius:8px; background:var(--tile); margin-bottom:12px; }
   .qh { display:flex; align-items:center; gap:10px; font:500 16px/1 Geist, sans-serif; margin-bottom:14px; white-space:nowrap; }
-  .qh svg { width:17px; height:17px; color:var(--accent); }
-  .qh b { margin-left:auto; font:600 18px/1 Geist, sans-serif; font-variant-numeric:tabular-nums; }
+  .qh svg { width:17px; height:17px; color:var(--accent); transition:transform .15s; }
+  .qh b { display:inline-block; margin-left:auto; transform-origin:right center; font:600 18px/1 Geist, sans-serif; font-variant-numeric:tabular-nums; }
+  .hint { font:400 12px/1.45 Geist, sans-serif; color:var(--muted); margin:0 4px 12px; }
+  .cap { font:400 12px/1 Geist, sans-serif; color:var(--muted); margin:14px 0 8px; }
+
+  /* Laufender Lichtstreifen um die Kachel, solange gesucht/verbunden wird */
+  .qt.scan::before { content:""; position:absolute; inset:-1.5px; border-radius:inherit; padding:1.5px; pointer-events:none;
+        background:conic-gradient(from var(--a), transparent 0 60%, var(--accent) 92%, transparent 100%);
+        -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;
+        animation:turn 1.5s linear infinite; }
+  @keyframes turn { to { --a:360deg; } }
 
   .row { display:flex; gap:12px; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .ob, .fx, .sw { position:relative; overflow:hidden; }
   .ob { flex:1; display:flex; align-items:center; justify-content:center; gap:10px; min-height:46px; padding:6px 12px;
         background:var(--fill); border:var(--line); border-radius:5px; font:500 16px/1.15 Geist, sans-serif; color:var(--text);
-        cursor:pointer; transition:border-color .12s, background .12s; }
-  .ob svg { width:15px; height:15px; color:var(--icon); }
+        cursor:pointer; transition:border-color .15s, background .15s, transform .12s var(--ease); }
+  .ob svg { width:15px; height:15px; color:var(--icon); transition:color .15s; }
+  .ob:active { transform:scale(.96); }
   .ob:active, .ob.on { border-color:var(--accent); background:var(--hot); }
   .ob:active svg, .ob.on svg { color:var(--accent); }
   @media (hover:hover) {
@@ -52,39 +106,92 @@
     .ob:hover:not(:disabled) svg { color:var(--accent); }
   }
   .ob:disabled { opacity:.35; cursor:default; }
+  #connect.on:not(:disabled) { animation:invite 2.6s ease-in-out infinite; }
+  @keyframes invite { 0%, 100% { box-shadow:0 0 0 0 rgba(255,210,63,0); } 50% { box-shadow:0 0 22px 0 rgba(255,210,63,.32); } }
+  .rip { position:absolute; border-radius:50%; background:rgba(255,210,63,.32); transform:scale(0); pointer-events:none; animation:rip .65s ease-out forwards; }
+  .sw .rip, .fx .rip { background:rgba(255,255,255,.4); }
+  @keyframes rip { to { transform:scale(1); opacity:0; } }
 
-  .status { display:flex; align-items:center; gap:10px; font:400 14px/1.25 Geist, sans-serif; color:var(--muted); margin-bottom:14px; }
-  .dot { width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.25); flex:none; }
-  .dot.on { background:var(--accent); box-shadow:0 0 10px rgba(255,210,63,.8); }
-  .dot.busy { background:var(--accent); animation:blink 1s ease-in-out infinite; }
+  .status { display:flex; align-items:center; gap:12px; font:400 14px/1.25 Geist, sans-serif; color:var(--muted); margin-bottom:14px; }
+  .dot { position:relative; width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.25); flex:none; transition:background .3s; }
+  .dot.on, .dot.busy { background:var(--accent); }
+  .dot.on { box-shadow:0 0 10px rgba(255,210,63,.8); }
+  .dot.on::after, .dot.busy::after { content:""; position:absolute; inset:-1.5px; border-radius:50%; border:1.5px solid var(--accent); animation:radar 1.3s ease-out infinite; }
+  .dot.on::after { animation-duration:3s; }
   .dot.on + span { color:var(--text); }
-  @keyframes blink { 50% { opacity:.25; } }
+  @keyframes radar { from { transform:scale(1); opacity:.9; } to { transform:scale(3.6); opacity:0; } }
 
-  input[type=color] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:54px; padding:0;
+  /* Farbe: aktuelles Farbfeld, Farbton- und Weißton-Leiste zum Ziehen, feste Farben */
+  input[type=color] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:48px; padding:0;
         border:var(--line); border-radius:5px; background:none; overflow:hidden; cursor:pointer; }
   input[type=color]::-webkit-color-swatch-wrapper { padding:0; }
   input[type=color]::-webkit-color-swatch { border:none; border-radius:0; }
   input[type=color]::-moz-color-swatch { border:none; border-radius:0; }
-  .swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:12px; }
-  .sw { aspect-ratio:1; border-radius:5px; border:1.5px solid rgba(255,255,255,.22); padding:0; cursor:pointer; }
-  .sw.on { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .bar { position:relative; height:34px; border-radius:5px; border:var(--line); touch-action:pan-y; cursor:pointer; }
+  .bar.hue { background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .bar.white { background:linear-gradient(90deg,rgb(255,147,41),rgb(255,214,170),#fff,rgb(201,226,255)); }
+  .bar i { position:absolute; top:-6px; bottom:-6px; left:0; width:12px; margin-left:-6px; border-radius:6px; background:#F4F1E8;
+        border:2px solid #14130e; box-shadow:0 0 0 1.5px var(--accent), 0 2px 10px rgba(0,0,0,.7); opacity:0; pointer-events:none;
+        transition:opacity .2s, transform .15s var(--ease); }
+  .bar.set i { opacity:1; }
+  .bar:active i { transform:scale(1.25, 1.08); }
+  .swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:16px; }
+  .sw { aspect-ratio:1; border-radius:5px; border:1.5px solid rgba(255,255,255,.22); padding:0; cursor:pointer; transition:transform .15s var(--ease), box-shadow .2s; }
+  .sw:active { transform:scale(.9); }
+  .sw.on { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 0 18px rgb(var(--led) / .6); }
 
   /* Regler wie in den Client-Einstellungen: gelbe Füllung, heller Knopf mit gelbem Ring */
   input[type=range] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:28px; margin:0; background:none; --f:.5; cursor:pointer; }
   input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px;
         background:linear-gradient(90deg, var(--accent) calc(10px + (100% - 20px) * var(--f)), rgba(255,255,255,.18) 0); }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; box-sizing:border-box; width:20px; height:20px; margin-top:-8px;
-        border-radius:50%; background:#F4F1E8; border:3px solid var(--accent); }
+        border-radius:50%; background:#F4F1E8; border:3px solid var(--accent); transition:box-shadow .2s; }
+  input[type=range]:active::-webkit-slider-thumb { box-shadow:0 0 0 9px rgba(255,210,63,.18), 0 0 18px rgba(255,210,63,.5); }
   input[type=range]::-moz-range-track { height:4px; border-radius:2px; background:rgba(255,255,255,.18); }
   input[type=range]::-moz-range-progress { height:4px; border-radius:2px; background:var(--accent); }
   input[type=range]::-moz-range-thumb { box-sizing:border-box; width:20px; height:20px; border-radius:50%; background:#F4F1E8; border:3px solid var(--accent); }
 
-  .log { font:400 12px/1.5 'Geist Mono', ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; max-height:110px; overflow:auto; }
+  /* Flow-Effekte: Karten mit laufender Vorschau, die aktive leuchtet in der Live-Farbe */
+  .fx { display:flex; flex-direction:column; gap:10px; padding:10px; text-align:left; background:var(--tile); border:var(--soft); border-radius:8px;
+        color:var(--text); font:500 15px/1.15 Geist, sans-serif; cursor:pointer; transition:border-color .25s, box-shadow .5s, transform .12s var(--ease); }
+  .fx:active { transform:scale(.96); }
+  .fx.on { border-color:var(--accent); box-shadow:0 0 30px rgb(var(--led) / .4); }
+  .pv { position:relative; display:block; height:46px; border-radius:4px; overflow:hidden; background:#0b0a07; }
+  .pv i { position:absolute; inset:0; width:200%; background:var(--g) 0 0 / 50% 100% repeat-x; animation:slide 10s linear infinite; }
+  .pv::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.16), transparent 42%, rgba(0,0,0,.28)); }
+  .fx.on .pv i { animation-duration:4s; }
+  .pv.breathe i { width:100%; background:rgb(var(--pick)); animation:pvbreath 3.2s ease-in-out infinite; }
+  .pv.candle i { width:100%; background:radial-gradient(ellipse 80% 130% at 50% 115%, #ffc46b, #ff7d1a 46%, #6b2400 100%); animation:pvcandle 2.6s ease-in-out infinite; }
+  .fx.on .pv.breathe i, .fx.on .pv.candle i { animation-duration:1.8s; }
+  @keyframes slide { to { transform:translateX(-50%); } }
+  @keyframes pvbreath { 0%, 100% { opacity:.3; } 50% { opacity:1; } }
+  @keyframes pvcandle { 0%, 100% { opacity:.78; } 18% { opacity:1; } 31% { opacity:.6; } 47% { opacity:.92; } 63% { opacity:.7; } 82% { opacity:.98; } }
+  .nm { display:flex; align-items:center; gap:8px; padding:0 2px 2px; }
+  .eq { display:flex; align-items:flex-end; gap:2px; height:12px; margin-left:auto; opacity:0; transition:opacity .25s; }
+  .fx.on .eq { opacity:1; }
+  .eq u { width:3px; height:12px; border-radius:1px; background:var(--accent); transform-origin:bottom; animation:eq .9s ease-in-out infinite; }
+  .eq u:nth-child(2) { animation-delay:-.3s; } .eq u:nth-child(3) { animation-delay:-.6s; }
+  @keyframes eq { 0%, 100% { transform:scaleY(.25); } 50% { transform:scaleY(1); } }
+
+  details.qt summary { display:flex; align-items:center; gap:10px; list-style:none; cursor:pointer; font:500 16px/1 Geist, sans-serif; }
+  details.qt summary::-webkit-details-marker { display:none; }
+  details.qt summary svg { width:17px; height:17px; color:var(--accent); }
+  details.qt summary .chev { margin-left:auto; color:var(--muted); transition:transform .25s var(--ease); }
+  details[open] summary .chev { transform:rotate(180deg); }
+  details.qt .grid2 { margin:14px 0 0; }
+
+  .log { font:400 12px/1.5 'Geist Mono', ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; max-height:110px; overflow:auto;
+        -webkit-user-select:text; user-select:text; }
   .brand { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:26px; font:700 12px/1 Geist, sans-serif; letter-spacing:.08em; }
   .brand svg { width:16px; height:16px; fill:var(--text); }
   .brand small { font:400 12px/1 Geist, sans-serif; letter-spacing:0; color:var(--muted); margin-left:2px; }
-  .needs-conn { transition:opacity .2s; }
+  .needs-conn { transition:opacity .5s; }
   .locked .needs-conn { opacity:.35; pointer-events:none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    #parts { display:none; }
+  }
 </style>
 </head>
 <body class="locked">
@@ -98,17 +205,23 @@
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 6.2 6 10.5a6 6 0 0 1-12 0C6 9.2 12 3 12 3z"/></symbol>
   <symbol id="i-speed" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-3M10 2h4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
 </svg>
 
 <main>
-  <header class="mark">
-    <svg><use href="#i-bulb"/></svg>
-    <h1>LED<b>CONTROL</b></h1>
+  <header class="hero">
+    <div class="sky" aria-hidden="true"><div class="wash"></div><div class="rays"></div><div class="halo"></div><div class="burst" id="burst"></div></div>
+    <svg class="bulb" viewBox="0 0 24 24" aria-hidden="true">
+      <path class="glass" d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/>
+      <path class="base" d="M9 19.5h6V21a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/>
+    </svg>
+    <h1 class="word" id="word" aria-label="LED Control"></h1>
   </header>
-  <div class="sub">Eigene App für ELK-BLEDOM-Leisten · v3</div>
+  <div class="sub">Eigene App für ELK-BLEDOM-Leisten · v4</div>
 
   <div class="sec">Verbindung</div>
-  <div class="qt">
+  <div class="qt" id="conn">
     <div class="status"><span class="dot" id="dot"></span><span id="status">Nicht verbunden</span></div>
     <div class="row">
       <button class="ob on" id="connect"><svg class="ic"><use href="#i-bt"/></svg>Verbinden</button>
@@ -123,29 +236,39 @@
       <button class="ob" id="off"><svg class="ic"><use href="#i-moon"/></svg>Aus</button>
     </div>
     <div class="qt">
-      <div class="qh"><svg class="ic"><use href="#i-sun"/></svg>Helligkeit<b><span id="briVal">100</span> %</b></div>
+      <div class="qh"><svg class="ic" id="sun"><use href="#i-sun"/></svg>Helligkeit<b><span id="briVal">100</span> %</b></div>
       <input type="range" id="bri" min="0" max="100" value="100" aria-label="Helligkeit">
     </div>
 
     <div class="sec">Farbe</div>
     <div class="qt">
       <div class="qh"><svg class="ic"><use href="#i-drop"/></svg>Farbe<b id="colVal">#FF0000</b></div>
-      <input type="color" id="color" value="#ff0000" aria-label="Farbe wählen">
+      <input type="color" id="color" value="#ff0000" aria-label="Eigene Farbe wählen">
+      <div class="cap">Farbton</div>
+      <div class="bar hue" id="hue" role="slider" aria-label="Farbton"><i></i></div>
+      <div class="cap">Weißton</div>
+      <div class="bar white" id="white" role="slider" aria-label="Weißton"><i></i></div>
       <div class="swatches" id="swatches"></div>
     </div>
 
-    <div class="sec">Effekte</div>
-    <div class="grid2" id="effects"></div>
+    <div class="sec">Flow-Effekte</div>
+    <div class="grid2" id="flows"></div>
+    <div class="hint">Diese Effekte berechnet die App live und überblendet ohne Sprünge. Sie laufen, solange die Seite offen und der Bildschirm an ist.</div>
     <div class="qt">
       <div class="qh"><svg class="ic"><use href="#i-speed"/></svg>Tempo<b><span id="spdVal">50</span> %</b></div>
       <input type="range" id="spd" min="0" max="100" value="50" aria-label="Tempo">
     </div>
+
+    <details class="qt">
+      <summary><svg class="ic"><use href="#i-list"/></svg>Standard-Effekte der Leiste<svg class="ic chev"><use href="#i-chev"/></svg></summary>
+      <div class="grid2" id="builtin"></div>
+    </details>
   </div>
 
   <div class="sec">Protokoll</div>
   <div class="qt"><div class="log" id="log"></div></div>
 
-  <footer class="brand"><svg><use href="#i-bulb"/></svg><span>LED<em>CONTROL</em></span><small>v3</small></footer>
+  <footer class="brand"><svg><use href="#i-bulb"/></svg><span>LED<em>CONTROL</em></span><small>v4</small></footer>
 </main>
 
 <script>
@@ -156,13 +279,14 @@ const CHAR    = '0000fff3-0000-1000-8000-00805f9b34fb';
 const NAME_PREFIX = 'ELK-BLED';
 const STORE = 'led-app.device';
 
-let device = null, ch = null, pending = null, busy = false;
+let device = null, ch = null;
 let wantConnected = false;  // true = Nutzer will verbunden sein -> bei Abbruch automatisch neu verbinden
 let attempt = 0;            // jede neue Aktion (Verbinden, Trennen, Neuverbinden) macht ältere ungültig
 let running = 0;            // Nummer der gerade laufenden Verbindungsaktion, 0 = keine
 let directFails = 0;
 
 const $ = id => document.getElementById(id);
+const root = document.documentElement;
 const log = m => { const l = $('log'); l.textContent = (new Date().toLocaleTimeString() + '  ' + m + '\n' + l.textContent).slice(0, 2000); };
 // Bluefy wirft teils Strings/Zahlen/Objekte ohne .message -> immer etwas Lesbares liefern
 const errText = e => {
@@ -187,24 +311,47 @@ const cmd = {
   speed:  (s) => [0x7e,0x00,0x02,s,0x00,0x00,0x00,0x00,0xef],
 };
 
+// --- Senden ---
+// Steuerbefehle (An/Aus, Helligkeit, Effekt, Tempo) gehen nie verloren, je Art zählt der neueste.
+// Von Farbwerten wird immer nur der neueste geschickt, damit sich bei Animationen nichts staut.
+const GAP = 28;             // ms Pause zwischen zwei Paketen
+const ctrl = new Map();
+let frame = null, pumping = false, lastSent = '', lastErrAt = 0;
+
 async function write(bytes) {
   if (!ch) return;
   const data = new Uint8Array(bytes);
   try {
     if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(data);
     else await ch.writeValue(data);
-  } catch (e) { log('Fehler: ' + errText(e)); }
+  } catch (e) {
+    if (Date.now() - lastErrAt > 3000) { lastErrAt = Date.now(); log('Fehler: ' + errText(e)); }
+  }
 }
-// Schieberegler/Farbrad schicken sehr viele Werte -> nur den neuesten senden
-function send(bytes) {
-  pending = bytes;
-  if (busy) return;
-  busy = true;
+function pump() {
+  if (pumping) return;
+  pumping = true;
   (async () => {
-    while (pending) { const b = pending; pending = null; await write(b); await sleep(40); }
-    busy = false;
+    try {
+      while (ch && (ctrl.size || frame)) {
+        if (ctrl.size) {
+          const [key, bytes] = ctrl.entries().next().value;
+          ctrl.delete(key); lastSent = '';
+          await write(bytes);
+        } else {
+          const f = frame, key = f.join(); frame = null;
+          if (key === lastSent) continue;       // gleiche Farbe nicht doppelt schicken
+          lastSent = key;
+          await write(cmd.color(f[0], f[1], f[2]));
+        }
+        await sleep(GAP);
+      }
+      if (!ch) { ctrl.clear(); frame = null; }
+    } finally { pumping = false; }
   })();
 }
+const sendCtrl = (key, bytes) => { ctrl.set(key, bytes); pump(); };
+const sendColor = c => { frame = c; pump(); };
 
 // --- Verbindung ---
 // state: 'off' (getrennt), 'busy' (sucht/verbindet), 'on' (verbunden)
@@ -213,10 +360,12 @@ function setState(state, text) {
   document.body.classList.toggle('locked', !on);
   $('dot').className = 'dot' + (on ? ' on' : state === 'busy' ? ' busy' : '');
   $('status').textContent = text;
+  $('conn').classList.toggle('scan', state === 'busy');
   $('connect').disabled = state !== 'off';
   $('connect').classList.toggle('on', state === 'off');
   $('disconnect').disabled = state === 'off';
   $('disconnect').textContent = state === 'busy' ? 'Abbrechen' : 'Trennen';
+  refreshLive();
 }
 
 // Geräteliste des Browsers. Erst nur die ELK-Leiste anbieten; lehnt der Browser Filter ab
@@ -245,10 +394,11 @@ async function openGatt(d, my) {
   const svc = await server.getPrimaryService(SERVICE);
   const c = await svc.getCharacteristic(CHAR);
   if (my !== attempt) { try { d.gatt.disconnect(); } catch (_) {} throw new Error('abgebrochen'); }
-  device = d; ch = c; wantConnected = true; directFails = 0;
+  device = d; ch = c; wantConnected = true; directFails = 0; lastSent = '';
   remember(d);
   setState('on', 'Verbunden mit ' + name);
   log('Verbunden mit ' + name + ' ✓');
+  celebrate();
 }
 
 function onDrop() {
@@ -341,54 +491,257 @@ async function autoConnect() {
   } finally { if (running === my) running = 0; }
 }
 
-// Nach dem Zurückwechseln in den Browser prüfen, ob die Verbindung noch steht
+// --- Licht: Zustand, Farbe und Animationen ---
+let power = null;           // null = unbekannt, sonst zuletzt gesendeter Zustand
+let cur = [255, 0, 0];      // zuletzt ausgegebene Farbe
+let base = [255, 0, 0];     // zuletzt gewählte feste Farbe (Grundfarbe für „Atmen“)
+let flow = null;            // laufender Flow-Effekt
+let anim = 0;               // Nummer der laufenden Farb-Animation (Flow oder Überblendung)
+let phase = 0, builtin = null, glowAt = 0;
+
+const TAU = Math.PI * 2;
+const ease = k => k * k * (3 - 2 * k);
+const hsv = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+const hueOf = ([r, g, b]) => { const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); if (!d) return 0;
+  return ((mx === r ? (g - b) / d : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360; };
+// Überblenden ohne Helligkeitsloch: die hellste Grundfarbe wandert gleichmäßig von a nach b
+const mix = (a, b, e) => {
+  const c = a.map((v, i) => v + (b[i] - v) * e), m = Math.max(c[0], c[1], c[2]);
+  const want = Math.max(a[0], a[1], a[2]) + (Math.max(b[0], b[1], b[2]) - Math.max(a[0], a[1], a[2])) * e;
+  return c.map(v => Math.round(m ? v * want / m : 0));
+};
+// Farbverlauf im Kreis durch mehrere Farben, immer mit voller Leuchtkraft
+const palette = stops => t => {
+  const n = stops.length, x = (t % 1) * n, i = Math.floor(x);
+  return mix(stops[i % n], stops[(i + 1) % n], ease(x - i));
+};
+const gradient = stops => 'linear-gradient(90deg,' + stops.concat([stops[0]]).map(s => 'rgb(' + s.join(',') + ')').join(',') + ')';
+
+const FLOWS = [
+  { id: 'rainbow', name: 'Regenbogen', css: 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)', at: t => hsv(t * 360, 1, 1) },
+  { id: 'aurora',  name: 'Polarlicht',      stops: [[0,255,130],[0,215,255],[80,110,255],[170,70,255]] },
+  { id: 'sunset',  name: 'Sonnenuntergang', stops: [[255,60,0],[255,135,0],[255,30,90],[190,0,255],[255,0,120]] },
+  { id: 'ocean',   name: 'Ozean',           stops: [[0,60,255],[0,170,255],[0,255,200],[0,170,255]] },
+  { id: 'lava',    name: 'Lava',            stops: [[255,0,0],[255,70,0],[255,150,0],[255,70,0]] },
+  { id: 'neon',    name: 'Neon',            stops: [[255,0,200],[130,0,255],[0,200,255],[130,0,255]] },
+  // Die gewählte Farbe wird sanft heller und dunkler, geht aber nie aus
+  { id: 'breathe', name: 'Atmen', rate: 4, at: t => { const v = .3 + .7 * (.5 - .5 * Math.cos(t * TAU)); return base.map(c => Math.round(c * v)); } },
+  // Warmes Licht mit ruhigem, unregelmäßigem Schimmern
+  { id: 'candle',  name: 'Kerzenschein', at: t => { const v = .8 + .12 * Math.sin(t * TAU * 7) + .05 * Math.sin(t * TAU * 17 + 1) + .03 * Math.sin(t * TAU * 31 + 2);
+      return [Math.round(255 * v), Math.round(118 * v * (.8 + .2 * v)), Math.round(22 * v * v)]; } },
+];
+
+const refreshLive = () => document.body.classList.toggle('live', !!ch && power !== false);
+function glow(c, force) {                    // Farbe der Leiste in der Seite spiegeln (gedrosselt)
+  const now = performance.now();
+  if (!force && now - glowAt < 80) return;
+  glowAt = now;
+  root.style.setProperty('--led', c[0] + ' ' + c[1] + ' ' + c[2]);
+}
+function show(c, force) { cur = c; sendColor(c); glow(c, force); }
+
+const clearMarks = sel => document.querySelectorAll(sel).forEach(b => b.classList.remove('on'));
+const barSet = el => document.querySelectorAll('.bar').forEach(b => b.classList.toggle('set', b === el));
+
+function setPower(on) {
+  power = on;
+  sendCtrl('power', on ? cmd.on() : cmd.off());
+  $('on').classList.toggle('on', on); $('off').classList.toggle('on', !on);
+  refreshLive();
+}
+
+// Bildschirm anlassen, solange ein Flow läuft (sonst hält iOS die Seite an)
+let wake = null, wakeHint = false;
+async function keepAwake(on) {
+  try {
+    if (on && !wake) {
+      if (!navigator.wakeLock) { if (!wakeHint) { wakeHint = true; log('Hinweis: Bildschirm anlassen, sonst pausiert der Flow.'); } return; }
+      wake = await navigator.wakeLock.request('screen');
+      wake.addEventListener('release', () => { wake = null; });
+    } else if (!on && wake) { const w = wake; wake = null; await w.release(); }
+  } catch (_) {}
+}
+
+function halt() {                             // laufende Animation beenden, Leiste bleibt auf der aktuellen Farbe
+  anim++;
+  if (flow) { flow = null; clearMarks('.fx.on'); keepAwake(false); }
+}
+
+function fadeTo(to, ms) {                     // weich von der aktuellen zur neuen Farbe
+  const from = cur.slice(), my = ++anim, t0 = performance.now();
+  (async () => {
+    while (my === anim) {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      show(mix(from, to, ease(k)), true);
+      if (k >= 1) return;
+      await sleep(33);
+    }
+  })();
+}
+
+// f: 0 = langsam (90 s pro Durchlauf) … 100 = schnell (3 s)
+const period = () => 90 * Math.pow(3 / 90, $('spd').value / 100);
+
+function startFlow(f, card) {
+  halt(); builtin = null;
+  clearMarks('.sw.on, #builtin .on'); barSet(null);
+  card.classList.add('on');
+  if (power !== true) setPower(true);
+  flow = f; keepAwake(true);
+  if (f.id === 'rainbow') phase = hueOf(cur) / 360;        // beim aktuellen Farbton einsteigen
+  const from = cur.slice(), my = ++anim, t0 = performance.now();
+  let last = t0;
+  (async () => {
+    while (my === anim) {
+      const now = performance.now(), dt = Math.min(now - last, 100) / 1000;
+      last = now;
+      if (ch && power !== false) {
+        phase = (phase + dt * (f.rate || 1) / period()) % 1;
+        let c = f.at(phase);
+        const k = (now - t0) / 900;                          // Einstieg: 0,9 s von der alten Farbe überblenden
+        if (k < 1) c = mix(from, c, ease(k));
+        show(c);
+      }
+      await sleep(34);
+    }
+  })();
+}
+
+function pickColor(c, opt) {
+  opt = opt || {};
+  halt(); builtin = null;
+  clearMarks('.sw.on, #builtin .on');
+  if (!opt.bar) barSet(null);
+  if (opt.mark) opt.mark.classList.add('on');
+  if (power !== true) setPower(true);
+  base = c.slice();
+  const hex = '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  $('color').value = hex; $('colVal').textContent = hex.toUpperCase();
+  root.style.setProperty('--pick', c.join(' '));
+  if (opt.instant) show(c, true); else fadeTo(c, 350);
+}
+
+// --- Bedienung ---
+const bump = el => { if (el.animate) el.animate([{ transform: 'scale(1.16)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' }); };
+const fillRange = el => el.style.setProperty('--f', (el.value - el.min) / (el.max - el.min));
+
+$('on').onclick  = () => setPower(true);
+$('off').onclick = () => setPower(false);
+
+const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+$('color').oninput = e => pickColor(hex2rgb(e.target.value), { instant: true });
+
+['#ff0000','#ff7a00','#ffd400','#00ff40','#00e5ff','#0040ff','#8a2be2','#ff00c8','#ffffff','#ff2a2a','#00ffa2','#ffb3d9']
+  .forEach(c => { const b = document.createElement('button'); b.className = 'sw'; b.style.background = c; b.setAttribute('aria-label', 'Farbe ' + c);
+    b.onclick = () => pickColor(hex2rgb(c), { mark: b }); $('swatches').appendChild(b); });
+
+// Leisten zum Ziehen: Farbton (Regenbogen) und Weißton (warm bis kalt)
+function dragBar(el, colorAt) {
+  let down = false;
+  const move = e => {
+    const r = el.getBoundingClientRect(), f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    el.firstElementChild.style.left = (f * 100) + '%';
+    barSet(el);
+    pickColor(colorAt(f), { instant: true, bar: true });
+  };
+  el.addEventListener('pointerdown', e => { down = true; try { el.setPointerCapture(e.pointerId); } catch (_) {} move(e); });
+  el.addEventListener('pointermove', e => { if (down) move(e); });
+  ['pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, () => { down = false; }));
+}
+const WHITES = [[255,147,41],[255,214,170],[255,255,255],[201,226,255]];
+dragBar($('hue'), f => hsv(Math.min(f, .999) * 360, 1, 1));
+dragBar($('white'), f => { const x = f * (WHITES.length - 1), i = Math.min(Math.floor(x), WHITES.length - 2); return WHITES[i].map((v, k) => Math.round(v + (WHITES[i + 1][k] - v) * (x - i))); });
+
+$('bri').oninput = e => {
+  const v = +e.target.value;
+  $('briVal').textContent = v; fillRange(e.target); bump($('briVal').parentNode);
+  $('sun').style.transform = 'rotate(' + (v * 1.8) + 'deg) scale(' + (.75 + v / 100 * .45) + ')';
+  sendCtrl('bright', cmd.bright(v));
+};
+$('spd').oninput = e => {
+  const v = +e.target.value;
+  $('spdVal').textContent = v; fillRange(e.target); bump($('spdVal').parentNode);
+  if (builtin !== null) sendCtrl('speed', cmd.speed(v));   // Flow-Effekte lesen das Tempo direkt vom Regler
+};
+fillRange($('bri')); fillRange($('spd'));
+
+FLOWS.forEach(f => {
+  if (f.stops) { f.at = palette(f.stops); f.css = gradient(f.stops); }
+  const b = document.createElement('button'); b.className = 'fx';
+  b.innerHTML = '<span class="pv ' + f.id + '"><i></i></span><span class="nm">' + f.name + '<span class="eq"><u></u><u></u><u></u></span></span>';
+  if (f.css) b.style.setProperty('--g', f.css);
+  b.onclick = () => { if (flow === f) halt(); else startFlow(f, b); };   // nochmal tippen = bei der aktuellen Farbe anhalten
+  $('flows').appendChild(b);
+});
+
+[['Springen RGB',0x87],['Springen bunt',0x88],['Überblenden RGB',0x89],['Überblenden bunt',0x8a],
+ ['Effekt 5',0x8b],['Effekt 6',0x8c],['Effekt 7',0x8d],['Blinken bunt',0x95]]
+  .forEach(([n, code]) => { const b = document.createElement('button'); b.className = 'ob'; b.textContent = n;
+    b.onclick = () => {
+      halt(); clearMarks('.sw.on, #builtin .on'); barSet(null);
+      if (power !== true) setPower(true);
+      builtin = code; b.classList.add('on');
+      sendCtrl('effect', cmd.effect(code));
+    };
+    $('builtin').appendChild(b); });
+
+// --- Seiten-Animationen ---
+// Schriftzug Buchstabe für Buchstabe
+(() => {
+  let i = 0;
+  const letters = t => t.split('').map(c => '<span style="--i:' + (i++) + '">' + c + '</span>').join('');
+  $('word').innerHTML = letters('LED') + '<b>' + letters('CONTROL') + '</b>';
+})();
+
+// Kacheln nacheinander einblenden; --j steuert die Reihenfolge beim Aufwachen nach dem Verbinden
+const risers = Array.from(document.querySelectorAll('main > .sec, main > .qt, .needs-conn > *, main > footer'));
+risers.forEach((el, i) => { el.classList.add('rise'); el.style.setProperty('--i', i); });
+const settle = () => risers.forEach(el => el.classList.remove('rise'));
+setTimeout(settle, 2800);
+document.querySelectorAll('.needs-conn > *').forEach((el, j) => el.style.setProperty('--j', j));
+
+function celebrate() {                        // Lichtring + Aufwachen der Bedienung, wenn die Verbindung steht
+  settle();
+  const b = $('burst');
+  b.classList.remove('go'); void b.offsetWidth; b.classList.add('go');
+  document.body.classList.add('justOn');
+  setTimeout(() => document.body.classList.remove('justOn'), 1700);
+}
+
+// Welle vom Finger aus beim Tippen
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('.ob, .fx, .sw');
+  if (!b || b.disabled) return;
+  const r = b.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2.2, s = document.createElement('span');
+  s.className = 'rip';
+  s.style.cssText = 'width:' + size + 'px;height:' + size + 'px;left:' + (e.clientX - r.left - size / 2) + 'px;top:' + (e.clientY - r.top - size / 2) + 'px';
+  b.appendChild(s);
+  s.addEventListener('animationend', () => s.remove());
+});
+document.addEventListener('touchstart', () => {}, { passive: true });   // damit :active auf iOS greift
+
+// Schwebende Lichtpunkte (feste Zufallsfolge, damit es bei jedem Laden gleich aussieht)
+(() => {
+  let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 26; i++) {
+    const p = document.createElement('i'), soft = rnd() < .3, size = soft ? 12 + rnd() * 14 : 2 + rnd() * 4, dur = 14 + rnd() * 22;
+    p.style.cssText = 'left:' + (rnd() * 100).toFixed(1) + '%;top:' + (8 + rnd() * 96).toFixed(1) + '%;width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) +
+      'px;--o:' + (soft ? .05 + rnd() * .07 : .2 + rnd() * .4).toFixed(2) + ';--d:' + dur.toFixed(1) + 's;--dl:-' + (rnd() * dur).toFixed(1) +
+      's;--dx:' + ((rnd() - .5) * 70).toFixed(0) + 'px' + (soft ? ';filter:blur(6px)' : '');
+    $('parts').appendChild(p);
+  }
+})();
+
+// Nach dem Zurückwechseln in den Browser: Verbindung prüfen, Bildschirm wieder wach halten
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && wantConnected && device && !device.gatt.connected && !running) {
+  if (document.visibilityState !== 'visible') return;
+  if (flow) keepAwake(true);
+  if (wantConnected && device && !device.gatt.connected && !running) {
     ch = null;
     log('Verbindung verloren – verbinde automatisch neu …');
     reconnect();
   }
 });
-
-// --- Bedienung ---
-const setPower = on => { send(on ? cmd.on() : cmd.off()); $('on').classList.toggle('on', on); $('off').classList.toggle('on', !on); };
-$('on').onclick  = () => setPower(true);
-$('off').onclick = () => setPower(false);
-
-const hex2rgb = h => [1,3,5].map(i => parseInt(h.substr(i,2),16));
-const clearMarks = sel => document.querySelectorAll(sel).forEach(b => b.classList.remove('on'));
-function setColor(hex, swatch) {
-  send(cmd.color(...hex2rgb(hex)));
-  $('colVal').textContent = hex.toUpperCase();
-  clearMarks('.sw.on, #effects .on');
-  if (swatch) swatch.classList.add('on');
-}
-$('color').oninput = e => setColor(e.target.value);
-
-['#ff0000','#ff7a00','#ffd400','#00ff40','#00e5ff','#0040ff','#8a2be2','#ff00c8','#ffffff','#ff2a2a','#00ffa2','#ffb3d9']
-  .forEach(c => { const b = document.createElement('button'); b.className = 'sw'; b.style.background = c; b.setAttribute('aria-label', 'Farbe ' + c);
-    b.onclick = () => { $('color').value = c; setColor(c, b); }; $('swatches').appendChild(b); });
-
-const fillRange = el => el.style.setProperty('--f', (el.value - el.min) / (el.max - el.min));
-$('bri').oninput = e => { $('briVal').textContent = e.target.value; fillRange(e.target); send(cmd.bright(+e.target.value)); };
-$('spd').oninput = e => { $('spdVal').textContent = e.target.value; fillRange(e.target); send(cmd.speed(+e.target.value)); };
-fillRange($('bri')); fillRange($('spd'));
-
-[['Springen RGB',0x87],['Springen bunt',0x88],['Überblenden RGB',0x89],['Überblenden bunt',0x8a],
- ['Effekt 5',0x8b],['Effekt 6',0x8c],['Effekt 7',0x8d],['Blinken bunt',0x95]]
-  .forEach(([n,code]) => { const b = document.createElement('button'); b.className = 'ob'; b.textContent = n;
-    b.onclick = () => { send(cmd.effect(code)); clearMarks('.sw.on, #effects .on'); b.classList.add('on'); }; $('effects').appendChild(b); });
-
-// Weiche Lichtpunkte im Hintergrund (feste Zufallsfolge, damit es bei jedem Laden gleich aussieht)
-(() => {
-  let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 28; i++) {
-    const p = document.createElement('i'), soft = rnd() < .3, size = soft ? 12 + rnd() * 14 : 2 + rnd() * 4;
-    p.style.cssText = 'left:' + (rnd() * 100).toFixed(1) + '%;top:' + (rnd() * 100).toFixed(1) + '%;width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) +
-      'px;opacity:' + (soft ? .05 + rnd() * .07 : .2 + rnd() * .4).toFixed(2) + (soft ? ';filter:blur(6px)' : '');
-    $('parts').appendChild(p);
-  }
-})();
 
 log('Bereit. Lotus Lamp X vorher schließen!');
 autoConnect();
