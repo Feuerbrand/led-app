@@ -5,7 +5,7 @@ struct EffectsTab: View {
     @Environment(LightController.self) private var light
 
     var body: some View {
-        let connected = light.hub.hasTargets
+        let connected = light.canControl
         TabPage {
             PageTitle(title: "Effekte", subtitle: "Berechnet live in der App, überblendet ohne Sprünge")
             Group {

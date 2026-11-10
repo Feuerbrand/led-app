@@ -260,7 +260,6 @@ jobs:
             <key>signingStyle</key><string>automatic</string>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
-            <key>testFlightInternalTestingOnly</key><true/>
           </dict>
           </plist>
           PLIST
@@ -313,3 +312,78 @@ jobs:
       - name: API-Schlüssel löschen
         if: always()
         run: rm -rf "$RUNNER_TEMP/keys"
+
+  # Bilder für den App Store (größtes iPhone), im Simulator im Vorführmodus aufgenommen
+  screenshots:
+    name: App-Store-Bilder
+    needs: build
+    if: github.event_name != 'schedule'
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Für den Simulator bauen
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
+            -quiet build
+
+      - name: Simulator starten
+        run: |
+          SIM=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          found = []
+          for runtime, items in devices.items():
+              m = re.search(r"iOS-(\d+)-(\d+)", runtime)
+              if not m:
+                  continue
+              for d in items:
+                  n = re.search(r"iPhone (\d+) Pro Max", d["name"])
+                  if n:
+                      found.append(((int(m.group(1)), int(m.group(2))), int(n.group(1)), d["udid"], d["name"], runtime))
+          found.sort()
+          best = found[-1]
+          print(best[2])
+          print("Simulator:", best[3], best[4], file=sys.stderr)
+          ')
+          xcrun simctl boot "$SIM"
+          xcrun simctl bootstatus "$SIM" -b
+          xcrun simctl ui "$SIM" appearance dark
+          xcrun simctl status_bar "$SIM" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          echo "SIM=$SIM" >> "$GITHUB_ENV"
+
+      - name: Bilder aufnehmen
+        run: |
+          APP=ios/build-sim/Build/Products/Release-iphonesimulator/LEDControl.app
+          xcrun simctl install "$SIM" "$APP"
+          mkdir -p shots
+          shoot() {
+            name=$1; shift
+            xcrun simctl terminate "$SIM" de.feuerbrand.ledcontrol 2>/dev/null || true
+            xcrun simctl launch "$SIM" de.feuerbrand.ledcontrol -demo YES "$@"
+            sleep 8
+            xcrun simctl io "$SIM" screenshot "shots/$name.png"
+          }
+          shoot 1-licht -screenshotTab light -screenshotFlow aurora
+          shoot 2-effekte -screenshotTab effects -screenshotFlow sunset
+          shoot 3-geraete -screenshotTab devices -screenshotColor FF7A00
+          shoot 4-mehr -screenshotTab more -screenshotColor 00E5FF
+          sips -g pixelWidth -g pixelHeight shots/*.png
+
+      - name: Bilder hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-store-bilder
+          path: shots/
+          if-no-files-found: error
+          retention-days: 90

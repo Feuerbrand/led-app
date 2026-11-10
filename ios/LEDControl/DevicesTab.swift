@@ -10,7 +10,7 @@ struct DevicesTab: View {
         TabPage {
             PageTitle(title: "Geräte", subtitle: "Alle eingeschalteten Lichter werden gemeinsam gesteuert")
 
-            if hub.bluetooth != .ready {
+            if hub.bluetooth != .ready && !light.demo {
                 BluetoothProblem(state: hub.bluetooth).rise(1)
             }
 
@@ -40,6 +40,7 @@ struct DevicesTab: View {
             NearbyList().rise(5)
 
             ShowAllTile().rise(6)
+            DemoTile()
 
             Hint(text: "Lotus Lamp X und andere Licht-Apps vorher ganz schließen – ein Licht nimmt immer nur eine Verbindung an.")
                 .padding(.top, 12)
@@ -238,6 +239,26 @@ private struct ShowAllTile: View {
             }
             .tint(Theme.accent)
             Text("Für Lichter mit anderem Namen. Die App versucht es dann mit den Befehlen der ELK-Leiste – das klappt nicht bei jedem Gerät.")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+        }
+        .tile()
+        .padding(.top, 12)
+    }
+}
+
+private struct DemoTile: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(get: { light.demo }, set: { light.setDemo($0) })) {
+                Text("Vorführmodus")
+                    .font(.geist(15, 500))
+                    .foregroundStyle(Theme.text)
+            }
+            .tint(Theme.accent)
+            Text("Die App lässt sich dann ohne Licht bedienen, zum Ausprobieren oder Vorführen. Verbundene Lichter steuert sie trotzdem mit.")
                 .font(.geist(12, 400))
                 .foregroundStyle(Theme.muted)
         }

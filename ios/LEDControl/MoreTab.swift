@@ -9,10 +9,10 @@ struct MoreTab: View {
         TabPage {
             PageTitle(title: "Mehr", subtitle: "Updates, Kurzbefehle und Protokoll")
             SectionTitle("Updates").rise(1)
-            if updater.viaTestFlight {
-                TestFlightTile().rise(2)
-            } else {
-                UpdatesTile().rise(2)
+            switch updater.source {
+            case .sideloaded: UpdatesTile().rise(2)
+            case .testFlight: TestFlightTile().rise(2)
+            case .appStore: AppStoreTile().rise(2)
             }
             SectionTitle("Siri & Kurzbefehle").rise(3)
             ShortcutsTile().rise(4)
@@ -149,6 +149,27 @@ private struct TestFlightTile: View {
                 Text("TestFlight öffnen")
             }
             .buttonStyle(OutlineButtonStyle(on: true))
+        }
+        .tile()
+    }
+}
+
+/// Aus dem App Store: Updates kommen wie bei jeder anderen App
+private struct AppStoreTile: View {
+    @Environment(Updater.self) private var updater
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Icon(kind: .check, size: 17, color: Theme.accent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Version \(updater.version)")
+                    .font(.geist(16, 600))
+                    .foregroundStyle(Theme.text)
+                Text("Updates kommen automatisch über den App Store.")
+                    .font(.geist(12, 400))
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer(minLength: 0)
         }
         .tile()
     }

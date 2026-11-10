@@ -5,7 +5,7 @@ struct LightTab: View {
     @Environment(LightController.self) private var light
 
     var body: some View {
-        let connected = light.hub.hasTargets
+        let connected = light.canControl
         TabPage {
             HeroView()
             Text("Eigene App für ELK-BLEDOM- und MELK-Lichter")
@@ -16,6 +16,7 @@ struct LightTab: View {
 
             UpdateBanner().rise(0)
             StatusTile().rise(1)
+            DemoOffer()
 
             // Alles, was eine Verbindung braucht: ohne Licht abgedunkelt und gesperrt
             Group {
@@ -73,6 +74,27 @@ private struct UpdateBanner: View {
 
 // MARK: - Verbindung
 
+/// Ohne verbundenes Licht: Angebot, die App im Vorführmodus auszuprobieren
+private struct DemoOffer: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        if !light.hub.hasTargets && !light.demo {
+            Button {
+                withAnimation(.easeOut(duration: 0.3)) { light.setDemo(true) }
+            } label: {
+                HStack(spacing: 8) {
+                    Icon(kind: .sparkle, size: 15)
+                    Text("Ohne Licht ausprobieren")
+                }
+            }
+            .buttonStyle(OutlineButtonStyle())
+            .padding(.top, 10)
+            .transition(.opacity)
+        }
+    }
+}
+
 /// Status aller Lichter auf einen Blick; Antippen öffnet „Geräte“
 private struct StatusTile: View {
     @Environment(LightController.self) private var light
@@ -80,14 +102,14 @@ private struct StatusTile: View {
 
     var body: some View {
         let hub = light.hub
-        let state = hub.summary
+        let state = light.link
         Button {
             nav.tab = .devices
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     StatusDot(state: state)
-                    Text(hub.statusText)
+                    Text(light.status)
                         .font(.geist(14, 400))
                         .foregroundStyle(state == .on ? Theme.text : Theme.muted)
                         .lineLimit(2)

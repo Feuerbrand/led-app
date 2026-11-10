@@ -42,15 +42,21 @@ final class LightController {
     /// Zuletzt gewählte Szene (für die Markierung)
     private(set) var sceneID: UUID? = nil
 
-    var link: LinkState { hub.summary }
-    var status: String { hub.statusText }
+    /// Vorführmodus: alles bedienen, ohne dass ein Licht verbunden ist (für Apples Prüfung, Screenshots, Ausprobieren)
+    private(set) var demo = false
+
+    /// Bedienung freigeben: ein Licht ist verbunden oder der Vorführmodus läuft
+    var canControl: Bool { hub.hasTargets || demo }
+
+    var link: LinkState { demo && !hub.hasTargets ? .on : hub.summary }
+    var status: String { demo && !hub.hasTargets ? "Vorführmodus – kein Licht verbunden" : hub.statusText }
 
     /// Verbunden und nicht ausgeschaltet -> die Oberfläche leuchtet in der Farbe der Lichter
-    var live: Bool { hub.hasTargets && power != false }
+    var live: Bool { canControl && power != false }
 
     /// Bildschirm anlassen, solange ein Flow läuft (sonst hält iOS die App an).
     /// Ist alles getrennt, darf das iPhone wieder normal schlafen.
-    var keepAwake: Bool { flowID != nil && hub.summary != .off }
+    var keepAwake: Bool { flowID != nil && link != .off }
 
     /// Vorschlag für den Namen einer neuen Szene
     var suggestedSceneName: String {
@@ -94,8 +100,41 @@ final class LightController {
     // MARK: - Verbindung
 
     /// Beim App-Start: Bluetooth einschalten, die Lichter werden dann von selbst gesucht
-    func start() { hub.start() }
+    func start() {
+        // Bei den automatischen App-Store-Bildern kein Bluetooth starten (keine Erlaubnis-Abfrage im Bild)
+        if UserDefaults.standard.bool(forKey: "demo") {
+            startScreenshotScene()
+            return
+        }
+        hub.start()
+    }
+
     func resume() { hub.resume() }
+
+    func setDemo(_ on: Bool) {
+        demo = on
+        if on {
+            if power == nil { power = true }
+            note("Vorführmodus an – die Bedienung läuft ohne Licht.")
+        } else {
+            note("Vorführmodus aus")
+        }
+    }
+
+    /// Für die automatischen App-Store-Bilder: Startargumente wie „-demo YES -screenshotFlow aurora“
+    @ObservationIgnored private var screenshotDone = false
+    private func startScreenshotScene() {
+        let args = UserDefaults.standard
+        guard !screenshotDone, args.bool(forKey: "demo") else { return }
+        screenshotDone = true
+        setDemo(true)
+        if let hex = args.string(forKey: "screenshotColor"), let c = RGB(hexString: hex) {
+            pick(c, instant: true)
+        }
+        if let id = args.string(forKey: "screenshotFlow"), let flow = Flow.everything.first(where: { $0.id == id }), flow.kind != .music {
+            toggleFlow(flow)
+        }
+    }
 
     /// Ein Licht ist frisch verbunden: den aktuellen Zustand übertragen, damit alle Lichter gleich aussehen.
     /// Solange in der App noch nichts eingestellt wurde, bleibt das Licht, wie es ist.
@@ -254,7 +293,7 @@ final class LightController {
                 let now = CACurrentMediaTime()
                 let dt = min(now - last, 0.1)
                 last = now
-                if hub.hasTargets, power != false {
+                if canControl, power != false {
                     phase = (phase + dt * f.rate / period).truncatingRemainder(dividingBy: 1)
                     // Musik: sofort hochschnellen, langsamer abklingen
                     envelope = max(meter.level, envelope * 0.86)
@@ -359,7 +398,7 @@ final class LightController {
             note("Kurzbefehl nicht erkannt: \(action)")
             return
         }
-        if hub.hasTargets {
+        if canControl {
             job()
         } else {
             pending = [job]

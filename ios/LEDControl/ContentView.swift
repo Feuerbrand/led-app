@@ -71,6 +71,10 @@ struct ContentView: View {
         .onChange(of: light.keepAwake, initial: true) { _, awake in
             UIApplication.shared.isIdleTimerDisabled = awake
         }
+        .onAppear {
+            let name = UserDefaults.standard.string(forKey: "screenshotTab") ?? ""
+            if let tab = AppTab.allCases.first(where: { "\($0)" == name }) { nav.tab = tab }
+        }
     }
 }
 

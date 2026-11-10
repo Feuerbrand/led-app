@@ -35,10 +35,15 @@ final class Updater {
     private(set) var status: Status = .idle
     private(set) var automatic: Bool
 
+    /// Woher die App kommt. Nur bei selbst installierten Apps (AltStore, Sideloadly …) sieht die App
+    /// selbst nach Updates; bei TestFlight und App Store kümmert sich Apple darum.
+    enum Source {
+        case sideloaded, testFlight, appStore
+    }
+
     let version: String
     let build: Int
-    /// Über TestFlight installiert: Updates kommen dann von Apple, nicht über GitHub
-    let viaTestFlight: Bool
+    let source: Source
 
     static let openTestFlight = URL(string: "itms-beta://")!
 
@@ -47,7 +52,7 @@ final class Updater {
 
     /// Neuere Version als die installierte, sonst nil
     var available: Release? {
-        guard !viaTestFlight, let latest, latest.build > build else { return nil }
+        guard source == .sideloaded, let latest, latest.build > build else { return nil }
         return latest
     }
 
@@ -57,10 +62,10 @@ final class Updater {
         build = Int(info["CFBundleVersion"] as? String ?? "") ?? 0
         let defaults = UserDefaults.standard
         automatic = defaults.object(forKey: Self.autoKey) as? Bool ?? true
-        // TestFlight-Apps haben eine Test-Quittung, aber (anders als selbst signierte) kein eingebettetes Profil
-        let sandbox = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        // Selbst signierte Apps enthalten ein Profil; TestFlight-Apps haben stattdessen eine Test-Quittung
         let profile = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil
-        viaTestFlight = sandbox && !profile
+        let sandbox = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        source = profile ? .sideloaded : (sandbox ? .testFlight : .appStore)
     }
 
     func setAutomatic(_ on: Bool) {
@@ -71,7 +76,7 @@ final class Updater {
 
     /// Nachsehen; ohne `force` höchstens alle 30 Minuten und nur, wenn automatisch eingeschaltet
     func check(force: Bool = false) {
-        if viaTestFlight || status == .checking { return }
+        if source != .sideloaded || status == .checking { return }
         if !force {
             guard automatic else { return }
             if let lastCheck, Date().timeIntervalSince(lastCheck) < 30 * 60 { return }

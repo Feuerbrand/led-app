@@ -104,6 +104,28 @@ Die folgenden Schritte machst du selbst – Anmeldung, Bezahlung und Schlüssel 
 
 Ab dann kommt jede Änderung an der App von selbst aufs iPhone. GitHub pausiert monatliche Läufe, wenn 60 Tage lang nichts am Repository geändert wurde; dann auf der Seite **Actions** einmal **Enable workflow** drücken.
 
+## Weg 4: Im App Store veröffentlichen
+
+Läuft TestFlight (Weg 3), kann dieselbe App in den App Store – ohne Zusatzkosten, solange sie kostenlos ist. Vorbereitet ist schon:
+
+- **Vorführmodus:** Apple hat keine Leiste zum Testen. Auf dem ersten Bildschirm gibt es deshalb **„Ohne Licht ausprobieren“**, unter **Geräte** den Schalter **Vorführmodus**.
+- **App-Store-Version:** Kommt die App aus dem App Store oder TestFlight, blendet sie alles zu AltStore, GitHub-Downloads und der eigenen Update-Prüfung aus und stellt keine Internetverbindung her.
+- **Bildschirmfotos:** Jeder Build nimmt im Simulator vier Bilder im größten iPhone-Format auf (Artifact **app-store-bilder** im Lauf auf GitHub).
+- **Texte:** [appstore/APPSTORE.md](appstore/APPSTORE.md) – Untertitel, Beschreibung, Schlüsselwörter, Hinweise für die Prüfer, Antworten zu Datenschutz und Altersfreigabe.
+- **Datenschutzerklärung und Hilfeseite:** [DATENSCHUTZ.md](DATENSCHUTZ.md) und [SUPPORT.md](SUPPORT.md).
+
+**Was du dann noch machst:**
+
+1. In `DATENSCHUTZ.md` und `SUPPORT.md` die Platzhalter in eckigen Klammern (Name, Anschrift, E-Mail) ausfüllen – direkt auf GitHub über das Stift-Symbol oder mir die Angaben geben. Die Seiten sind öffentlich.
+2. **App Store Connect → deine App → App-Informationen:** Untertitel, Kategorie, Inhaltsrechte, Altersfreigabe und die Datenschutz-URL aus `APPSTORE.md` eintragen.
+3. **App-Datenschutz:** „Nein, wir erfassen keine Daten“.
+4. **Preise und Verfügbarkeit:** kostenlos.
+5. **Händlerstatus** (EU): siehe Ende von `APPSTORE.md`.
+6. Links die **iOS-Version** öffnen: Versionsnummer auf die des Builds setzen (z. B. `1.1.12`), Bildschirmfotos hochladen, Werbetext, Beschreibung, Schlüsselwörter, Support-URL und Copyright einfügen, unter **Build** den neuesten auswählen, bei **App-Prüfung** Kontakt und die Notizen samt Video-Link eintragen.
+7. **Zur Prüfung hinzufügen** → **Zur Prüfung einreichen.** Die Prüfung dauert meist ein bis drei Tage. Lehnt Apple ab, steht der Grund in App Store Connect – schick ihn mir.
+
+Nach der Freigabe aktualisiert sich die App wie jede andere über den App Store. Für jede neue App-Store-Version wiederholst du Schritt 6 und 7 mit dem neuen Build.
+
 ## Die .ipa herunterladen
 
 - **Fertige Versionen:** im Repository rechts unter **Releases** → oberste Version → `LEDControl.ipa`.
@@ -206,6 +228,8 @@ Wenn etwas hakt, hilft das **Protokoll** unter **Mehr**: den Text lange gedrück
 | `LEDControl/Fonts/` | Geist und Geist Mono als `.ttf`, umgewandelt aus den `.woff2`-Dateien in `fonts/` (Lizenz: `OFL.txt`) |
 | `Tests/` | Selbsttest: `make-expected.mjs` berechnet Soll-Werte mit dem echten Code aus `index.html`, `main.swift` vergleicht die App-Logik damit und prüft die MELK-Bytes. Läuft bei jedem Build. |
 | `scripts/make-source.py` | erzeugt die AltStore-Quelle aus der fertigen `.ipa` |
+| `LEDControl/PrivacyInfo.xcprivacy` | Datenschutz-Angaben für Apple (keine Datensammlung) |
+| `DATENSCHUTZ.md`, `SUPPORT.md`, `appstore/APPSTORE.md` | Datenschutzerklärung, Hilfeseite und alle Texte für den App Store |
 | `../.github/workflows/ios.yml` | Build auf GitHub, auf `main` zusätzlich Veröffentlichung |
 
 Wer doch einmal einen Mac hat: `brew install xcodegen`, im Ordner `ios` `xcodegen generate` ausführen und `LEDControl.xcodeproj` in Xcode öffnen.
