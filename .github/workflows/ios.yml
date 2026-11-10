@@ -9,6 +9,7 @@ name: iOS-App bauen
 on:
   workflow_dispatch:
   push:
+    branches: ['**']        # nur Zweige; Tags (z. B. von Releases) starten keinen Build
     paths:
       - 'ios/**'
       - '.github/workflows/ios.yml'
