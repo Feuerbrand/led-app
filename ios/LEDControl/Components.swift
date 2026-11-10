@@ -17,7 +17,7 @@ struct Page<Content: View>: View {
                 content
             }
             .frame(maxWidth: 520)
-            .padding(EdgeInsets(top: 8, leading: 16, bottom: 32, trailing: 16))
+            .padding(EdgeInsets(top: 8, leading: 16, bottom: 36, trailing: 16))
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -31,32 +31,26 @@ struct PageTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased())
-                .font(.geist(26, 700))
-                .tracking(2)
+            Text(title)
+                .font(.geist(32, 700))
                 .foregroundStyle(Theme.text)
-            Text(subtitle)
-                .font(.geist(13, 400))
+            Text(subtitle.uppercased())
+                .font(.geistMono(11, 500))
+                .tracking(1.2)
                 .foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 2)
         .rise(0)
     }
 }
 
-/// Warmes Schwarz mit Lichtpunkten hinter jeder Seite
+/// Hintergrund mit Lochraster hinter jeder Seite
 struct PageBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background {
-                ZStack {
-                    Backdrop()
-                    ParticleField()
-                }
-                .ignoresSafeArea()
-            }
+            .background { Backdrop() }
             .toolbarBackground(.hidden, for: .navigationBar)
     }
 }
@@ -65,114 +59,194 @@ extension View {
     func pageBackground() -> some View { modifier(PageBackground()) }
 }
 
-// MARK: - Status
+// MARK: - LEDs
 
-/// Punkt vor dem Status: grau = getrennt, gelb mit Ringen = sucht (schnell) oder verbunden (ruhig)
-struct StatusDot: View {
-    let state: LinkState
-
-    var body: some View {
-        Circle()
-            .fill(state == .off ? Color.white.opacity(0.25) : Theme.accent)
-            .frame(width: 9, height: 9)
-            .shadow(color: Theme.accent.opacity(state == .on ? 0.8 : 0), radius: 5)
-            .background {
-                if state != .off {
-                    let period = state == .on ? 3.0 : 1.3
-                    Clock { t in
-                        let p = t.truncatingRemainder(dividingBy: period) / period
-                        let out = 1 - (1 - p) * (1 - p)
-                        Circle()
-                            .strokeBorder(Theme.accent, lineWidth: 1.5)
-                            .frame(width: 12, height: 12)
-                            .scaleEffect(CGFloat(1 + 2.6 * out))
-                            .opacity(0.9 * (1 - out))
-                    }
-                }
-            }
-    }
-}
-
-/// Laufender Lichtstreifen um eine Kachel: beim Suchen gelb, bei laufenden Effekten in der Farbe des Lichts
-struct ScanBorder: View {
-    var radius: CGFloat = 8
-    var color: Color = Theme.accent
-    var period: Double = 1.5
-    var width: CGFloat = Theme.border
-
-    var body: some View {
-        Clock { t in
-            RoundedRectangle(cornerRadius: radius)
-                .strokeBorder(
-                    AngularGradient(
-                        stops: [
-                            .init(color: color.opacity(0), location: 0),
-                            .init(color: color.opacity(0), location: 0.6),
-                            .init(color: color, location: 0.92),
-                            .init(color: color.opacity(0), location: 1),
-                        ],
-                        center: .center,
-                        angle: .degrees((t / period * 360).truncatingRemainder(dividingBy: 360))),
-                    lineWidth: width)
+/// Zeichnet eine einzelne LED: aus = dunkler Punkt; an = Punkt in der Farbe mit kleinem, echtem Lichthof
+enum LED {
+    static func draw(_ context: GraphicsContext, at p: CGPoint, size d: CGFloat, color: Color?) {
+        let rect = CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d)
+        guard let color else {
+            context.fill(Path(ellipseIn: rect), with: .color(Theme.ledOff))
+            return
         }
-        .allowsHitTesting(false)
+        let halo = d * 1.25
+        context.fill(
+            Path(ellipseIn: rect.insetBy(dx: -halo, dy: -halo)),
+            with: .radialGradient(Gradient(colors: [color.opacity(0.42), color.opacity(0)]),
+                                  center: p, startRadius: 0, endRadius: d / 2 + halo))
+        context.fill(Path(ellipseIn: rect), with: .color(color))
+        // Kleiner Glanzpunkt wie auf einer echten LED-Linse
+        context.fill(Path(ellipseIn: CGRect(x: p.x - d * 0.2, y: p.y - d * 0.32, width: d * 0.3, height: d * 0.22)),
+                     with: .color(Color.white.opacity(0.5)))
+    }
+
+    /// Farbe mit der Helligkeit verrechnet (dunkle Stufen bleiben sichtbar)
+    static func dim(_ c: RGB, _ brightness: Int) -> Color {
+        let k = 0.3 + 0.7 * Double(min(max(brightness, 0), 100)) / 100
+        return Color(.sRGB, red: Double(c.r) / 255 * k, green: Double(c.g) / 255 * k, blue: Double(c.b) / 255 * k, opacity: 1)
     }
 }
 
-/// Weiches, langsam wanderndes Farblicht aus den Farben der Lichter (Hintergrund im Hauptmenü)
-struct AuroraGlow: View {
-    let colors: [Color]
-    let live: Bool
+/// Merkt sich die Farben der letzten Sekunden, damit eine LED-Reihe sie „entlanglaufen“ lassen kann
+final class ColorTrail {
+    private var samples: [(t: Double, c: RGB)] = []
 
+    func push(_ c: RGB, at t: Double) {
+        if samples.last?.c == c { return }
+        samples.append((t: t, c: c))
+        // Nur die letzten Sekunden behalten (mindestens einen Wert davor)
+        if let cut = samples.lastIndex(where: { $0.t < t - 3 }), cut > 0 {
+            samples.removeFirst(cut)
+        }
+    }
+
+    func color(at t: Double, fallback: RGB) -> RGB {
+        guard let first = samples.first else { return fallback }
+        var result = first.c
+        for s in samples where s.t <= t { result = s.c }
+        return result
+    }
+}
+
+/// LED-Feld: eine oder mehrere Reihen. Mit einer Farbe läuft jede Änderung von links nach rechts durch,
+/// mit mehreren Farben bekommt jedes Licht einen eigenen Abschnitt.
+struct LEDPanel: View {
+    let colors: [RGB]
+    let live: Bool
+    var brightness: Int = 100
+    var rows: Int = 1
+    var dot: CGFloat = 7
+    var gap: CGFloat = 5
+    /// Verzögerung je LED beim Durchlaufen einer Farbänderung (Sekunden)
+    var delay: Double = 0.03
+
+    @State private var trail = ColorTrail()
     @Environment(\.accessibilityReduceMotion) private var still
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still || !live)) { timeline in
+            let now = timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
-                let list = colors.isEmpty ? [Theme.accent] : colors
-                let n = max(list.count, 3)
-                let r = Double(max(size.width, size.height)) * 0.5
-                context.blendMode = .screen
-                for i in 0..<n {
-                    let c = list[i % list.count]
-                    let phase = Double(i) / Double(n) * 2 * Double.pi
-                    let x = Double(size.width) * (0.5 + 0.36 * cos(t * 0.11 + phase))
-                    let y = Double(size.height) * (0.28 + 0.16 * sin(t * 0.15 + phase * 1.3))
-                    let glow = Gradient(colors: [c.opacity(live ? 0.30 : 0.07), c.opacity(0)])
-                    context.fill(
-                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
-                        with: .radialGradient(glow, center: CGPoint(x: x, y: y), startRadius: 0, endRadius: CGFloat(r)))
+                let cols = max(Int((size.width + gap) / (dot + gap)), 1)
+                let width = CGFloat(cols) * dot + CGFloat(cols - 1) * gap
+                let height = CGFloat(rows) * dot + CGFloat(rows - 1) * gap
+                let x0 = (size.width - width) / 2 + dot / 2
+                let y0 = (size.height - height) / 2 + dot / 2
+                for r in 0..<rows {
+                    for i in 0..<cols {
+                        var c: Color? = nil
+                        if live {
+                            if colors.count > 1 {
+                                let seg = min(i * colors.count / cols, colors.count - 1)
+                                c = LED.dim(colors[seg], brightness)
+                            } else {
+                                let fallback = colors.first ?? RGB(255, 210, 63)
+                                c = LED.dim(trail.color(at: now - Double(i) * delay, fallback: fallback), brightness)
+                            }
+                        }
+                        let p = CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: y0 + CGFloat(r) * (dot + gap))
+                        LED.draw(context, at: p, size: dot, color: c)
+                    }
                 }
             }
         }
-        .allowsHitTesting(false)
+        .frame(height: CGFloat(rows) * dot + CGFloat(rows - 1) * gap + dot * 2.6)
+        .onChange(of: colors.first ?? RGB(0, 0, 0), initial: true) { _, c in
+            trail.push(c, at: Date().timeIntervalSinceReferenceDate)
+        }
+        .accessibilityHidden(true)
     }
 }
 
-/// Leuchtende „LED-Leiste“ in den aktuellen Farben (eine Farbe oder mehrere nebeneinander)
-struct LightStrip: View {
-    let colors: [Color]
-    let live: Bool
-    var height: CGFloat = 6
+/// Laufende Vorschau eines Effekts als LED-Reihe – so, wie er auf einer Leiste aussieht
+struct EffectLEDs: View {
+    let flow: Flow
+    let base: RGB
+    let active: Bool
+    var dot: CGFloat = 6
+    var gap: CGFloat = 4
 
     var body: some View {
-        let list = colors.isEmpty ? [Theme.accent] : colors
-        let fill: AnyShapeStyle = live
-            ? AnyShapeStyle(LinearGradient(colors: list.count == 1 ? [list[0], list[0]] : list, startPoint: .leading, endPoint: .trailing))
-            : AnyShapeStyle(Color.white.opacity(0.12))
-        Capsule()
-            .fill(fill)
-            .overlay {
-                Capsule()
-                    .fill(Color.white.opacity(live ? 0.35 : 0))
-                    .frame(height: max(height * 0.3, 1))
-                    .blur(radius: 0.5)
+        Clock { t in
+            Canvas { context, size in
+                let n = max(Int((size.width + gap) / (dot + gap)), 1)
+                let width = CGFloat(n) * dot + CGFloat(n - 1) * gap
+                let x0 = (size.width - width) / 2 + dot / 2
+                for i in 0..<n {
+                    let c = Self.color(flow, base: base, i: i, n: n, t: t, fast: active)
+                    LED.draw(context, at: CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: size.height / 2), size: dot, color: c)
+                }
             }
-            .frame(height: height)
-            .shadow(color: list[0].opacity(live ? 0.9 : 0), radius: height * 1.3)
-            .shadow(color: list[list.count - 1].opacity(live ? 0.55 : 0), radius: height * 3.2)
-            .animation(.easeOut(duration: 0.4), value: live)
+        }
+        .frame(height: dot * 3.4)
+        .accessibilityHidden(true)
+    }
+
+    static func color(_ flow: Flow, base: RGB, i: Int, n: Int, t: Double, fast: Bool) -> Color? {
+        let period = fast ? 4.0 : 9.0
+        let x = Double(i) / Double(max(n - 1, 1))
+        switch flow.kind {
+        case .music:
+            // Pegelanzeige: von links leuchten so viele LEDs, wie es gerade laut ist
+            let level = 0.3 + 0.35 * abs(sin(t * (fast ? 3.4 : 1.9))) + 0.3 * abs(sin(t * (fast ? 7.1 : 3.3) + 1))
+            if x > level { return nil }
+            return ColorMath.hsv(x * 300, 1, 1).color
+        case .breathe:
+            let phase = (t / (period * 0.8)).truncatingRemainder(dividingBy: 1)
+            return flow.color(at: phase, base: base).color
+        case .candle:
+            let phase = (t / (period * 3) + x * 0.07).truncatingRemainder(dividingBy: 1)
+            return flow.color(at: phase, base: base).color
+        case .rainbow, .palette:
+            var phase = (t / period - x * 0.55).truncatingRemainder(dividingBy: 1)
+            if phase < 0 { phase += 1 }
+            return flow.color(at: phase, base: base).color
+        }
+    }
+}
+
+/// Lauflicht hin und her (beim Suchen von Lichtern)
+struct ScannerLEDs: View {
+    var dot: CGFloat = 7
+    var gap: CGFloat = 5
+
+    var body: some View {
+        Clock { t in
+            Canvas { context, size in
+                let n = max(Int((size.width + gap) / (dot + gap)), 2)
+                let width = CGFloat(n) * dot + CGFloat(n - 1) * gap
+                let x0 = (size.width - width) / 2 + dot / 2
+                // Position pendelt weich zwischen erster und letzter LED
+                let p = (1 - cos(t * 2.4)) / 2 * Double(n - 1)
+                for i in 0..<n {
+                    let d = abs(Double(i) - p)
+                    let c: Color? = d < 3 ? Theme.accent.opacity(1 - d / 3) : nil
+                    LED.draw(context, at: CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: size.height / 2), size: dot, color: c)
+                }
+            }
+        }
+        .frame(height: dot * 3.4)
+        .accessibilityLabel("Sucht")
+    }
+}
+
+// MARK: - Status
+
+/// Status-LED: aus = dunkel, verbindet = blinkt, verbunden = leuchtet
+struct StatusLED: View {
+    let state: LinkState
+
+    var body: some View {
+        Clock { t in
+            let blink = state == .busy ? t.truncatingRemainder(dividingBy: 0.9) < 0.45 : true
+            let lit = state != .off && blink
+            Circle()
+                .fill(lit ? Theme.accent : Theme.ledOff)
+                .frame(width: 8, height: 8)
+                .shadow(color: Theme.accent.opacity(lit ? 0.85 : 0), radius: 4)
+        }
+        .frame(width: 8, height: 8)
+        .accessibilityHidden(true)
     }
 }
 
@@ -190,7 +264,7 @@ struct SignalBars: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(1...3, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 1)
+                Rectangle()
                     .fill(i <= level ? Theme.text : Color.white.opacity(0.18))
                     .frame(width: 3, height: CGFloat(4 + i * 3))
             }
@@ -200,21 +274,7 @@ struct SignalBars: View {
     }
 }
 
-/// Kleiner, sich drehender Bogen: „sucht gerade“
-struct SearchingMark: View {
-    var body: some View {
-        Clock { t in
-            Circle()
-                .trim(from: 0, to: 0.7)
-                .stroke(Theme.accent, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                .frame(width: 12, height: 12)
-                .rotationEffect(.degrees((t * 300).truncatingRemainder(dividingBy: 360)))
-        }
-        .accessibilityLabel("Sucht")
-    }
-}
-
-/// Grauer Hinweistext unter oder zwischen Kacheln
+/// Grauer Hinweistext unter oder zwischen Paneelen
 struct Hint: View {
     let text: String
 
@@ -224,7 +284,32 @@ struct Hint: View {
             .foregroundStyle(Theme.muted)
             .lineSpacing(2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
+    }
+}
+
+/// Kleines Abzeichen: kann das Licht Lauflichter (RGBIC) oder nur eine Farbe (RGB)?
+struct PixelBadge: View {
+    let kind: PixelKind
+
+    var body: some View {
+        if let text = kind.badge {
+            let addressable = kind == .addressable
+            Text(text)
+                .font(.geistMono(10, 700))
+                .tracking(1)
+                .foregroundStyle(addressable ? Theme.ink : Theme.muted)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background {
+                    if addressable {
+                        Rectangle().fill(Theme.accent)
+                    } else {
+                        Rectangle().strokeBorder(Theme.hair, lineWidth: 1)
+                    }
+                }
+                .accessibilityLabel(addressable ? "Einzeln steuerbare LEDs" : "Eine Farbe für die ganze Leiste")
+        }
     }
 }
 
@@ -245,7 +330,7 @@ struct BluetoothProblem: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Icon(kind: .bluetooth, size: 17, color: Theme.accent)
+                StatusLED(state: state == .starting ? .busy : .off)
                 Text(text)
                     .font(.geist(14, 500))
                     .foregroundStyle(Theme.text)
@@ -260,7 +345,95 @@ struct BluetoothProblem: View {
     }
 }
 
-// MARK: - Knöpfe
+// MARK: - Bedienelemente
+
+/// Kippschalter wie an einem Gerät: gelb = an
+struct PowerSwitch: View {
+    let target: Target
+
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        let usable = light.demo || light.isConnected(target)
+        let on = usable && light.lookOf(target).power != false
+        Button {
+            light.setPower(!on, for: target)
+        } label: {
+            ZStack(alignment: on ? .trailing : .leading) {
+                Capsule()
+                    .fill(on ? Theme.accent : Theme.ledOff)
+                Circle()
+                    .fill(on ? Theme.ink : Theme.text.opacity(0.85))
+                    .frame(width: 22, height: 22)
+                    .padding(4)
+            }
+            .frame(width: 54, height: 30)
+            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: on)
+        }
+        .buttonStyle(PressStyle(scale: 0.94))
+        .disabled(!usable)
+        .opacity(usable ? 1 : 0.35)
+        .sensoryFeedback(.impact(weight: .medium), trigger: on)
+        .accessibilityLabel(on ? "Ausschalten" : "Einschalten")
+    }
+}
+
+/// Pegel aus Segmenten (Helligkeit, Tempo) mit großer Zahl; ziehen oder antippen zum Einstellen
+struct LEDMeter: View {
+    let label: String
+    let value: Int
+    let onChange: (Int) -> Void
+
+    private static let segments = 24
+
+    var body: some View {
+        let lit = Int((Double(value) / 100 * Double(Self.segments)).rounded())
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(label.uppercased())
+                    .font(.geistMono(11, 600))
+                    .tracking(1.6)
+                    .foregroundStyle(Theme.muted)
+                Spacer(minLength: 8)
+                Text("\(value)")
+                    .font(.geistMono(34, 600))
+                    .foregroundStyle(Theme.text)
+                    .contentTransition(.numericText(value: Double(value)))
+                    .animation(.snappy(duration: 0.2), value: value)
+                Text("%")
+                    .font(.geistMono(14, 500))
+                    .foregroundStyle(Theme.muted)
+            }
+            HStack(spacing: 3) {
+                ForEach(0..<Self.segments, id: \.self) { i in
+                    Rectangle()
+                        .fill(i < lit ? Theme.accent : Theme.ledOff)
+                        .shadow(color: Theme.accent.opacity(i < lit ? 0.55 : 0), radius: 3)
+                }
+            }
+            .frame(height: 26)
+            .animation(.easeOut(duration: 0.08), value: lit)
+            .overlay {
+                DragStrip { f in
+                    let v = Int((f * 100).rounded())
+                    if v != value { onChange(v) }
+                }
+            }
+        }
+        .tile()
+        .sensoryFeedback(.selection, trigger: lit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(value) Prozent")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onChange(min(value + 10, 100))
+            case .decrement: onChange(max(value - 10, 0))
+            @unknown default: break
+            }
+        }
+    }
+}
 
 /// Kleiner Knopf mit gelbem Rahmen (Hinzufügen, Prüfen …)
 struct CompactButtonStyle: ButtonStyle {
@@ -270,11 +443,11 @@ struct CompactButtonStyle: ButtonStyle {
             .environment(\.iconTint, Theme.accent)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(configuration.isPressed ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 5))
+            .background(configuration.isPressed ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.accent, lineWidth: Theme.border)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.accent, lineWidth: 1)
             }
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
@@ -294,11 +467,10 @@ struct AccentButtonStyle: ButtonStyle {
         var body: some View {
             label
                 .font(.geist(16, 600))
-                .foregroundStyle(Color(rgb: 0x14130E))
-                .environment(\.iconTint, Color(rgb: 0x14130E))
+                .foregroundStyle(Theme.ink)
+                .environment(\.iconTint, Theme.ink)
                 .frame(maxWidth: .infinity, minHeight: 50)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8))
-                .shadow(color: Theme.accent.opacity(pressed ? 0.2 : 0.45), radius: pressed ? 6 : 16)
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
                 .scaleEffect(pressed ? 0.97 : 1)
                 .opacity(enabled ? 1 : 0.4)
                 .animation(.easeOut(duration: 0.12), value: pressed)
@@ -306,188 +478,21 @@ struct AccentButtonStyle: ButtonStyle {
     }
 }
 
-/// Runder Knopf mit Symbol (Kopfzeile des Hauptmenüs)
-struct CircleIconButton: View {
+/// Eckiger Knopf mit Symbol (Kopfzeile des Hauptmenüs)
+struct SquareIconButton: View {
     let icon: IconKind
     let label: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Icon(kind: icon, size: 19, color: Theme.text)
-                .frame(width: 44, height: 44)
-                .background(Theme.fill, in: Circle())
-                .overlay { Circle().strokeBorder(Theme.soft, lineWidth: Theme.border) }
+            Icon(kind: icon, size: 18, color: Theme.text)
+                .frame(width: 42, height: 42)
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+                .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1) }
         }
-        .buttonStyle(PressStyle(scale: 0.9))
+        .buttonStyle(PressStyle(scale: 0.92))
         .accessibilityLabel(label)
-    }
-}
-
-// MARK: - Abzeichen „RGBIC“ / „RGB“
-
-/// Kleines Abzeichen: kann das Licht Lauflichter (RGBIC) oder nur eine Farbe (RGB)?
-struct PixelBadge: View {
-    let kind: PixelKind
-
-    var body: some View {
-        if let text = kind.badge {
-            let addressable = kind == .addressable
-            Text(text)
-                .font(.geist(10, 700))
-                .tracking(0.8)
-                .foregroundStyle(addressable ? Color(rgb: 0x14130E) : Theme.muted)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background {
-                    if addressable {
-                        Capsule().fill(LinearGradient(colors: [Color(rgb: 0xFF3B6B), Theme.accent, Color(rgb: 0x3BE0FF)],
-                                                      startPoint: .leading, endPoint: .trailing))
-                    } else {
-                        Capsule().strokeBorder(Theme.soft, lineWidth: 1)
-                    }
-                }
-                .accessibilityLabel(addressable ? "Einzeln steuerbare LEDs" : "Eine Farbe für die ganze Leiste")
-        }
-    }
-}
-
-// MARK: - Lampe als kleines Symbol
-
-/// Kleine Lampe, die in der Farbe des Lichts leuchtet (Karten im Hauptmenü)
-struct LampBadge: View {
-    let color: RGB
-    let live: Bool
-    var size: CGFloat = 30
-
-    var body: some View {
-        ZStack {
-            BulbGlass().fill(live ? color.color : Theme.text.opacity(0.35))
-            BulbBase().fill(Theme.icon.opacity(live ? 1 : 0.5))
-        }
-        .frame(width: size, height: size)
-        .shadow(color: color.color.opacity(live ? 0.9 : 0), radius: size * 0.25)
-        .shadow(color: color.color.opacity(live ? 0.5 : 0), radius: size * 0.6)
-    }
-}
-
-// MARK: - Vorschauen der Effekte
-
-struct FlowPreview: View {
-    let flow: Flow
-    let on: Bool
-    let t: Double
-    let pick: Color
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            ZStack(alignment: .topLeading) {
-                Color(rgb: 0x0B0A07)
-                switch flow.kind {
-                case .breathe:
-                    // Die gewählte Farbe, langsam heller und dunkler
-                    let period = on ? 1.8 : 3.2
-                    pick.opacity(0.65 - 0.35 * cos(t * 2 * Double.pi / period))
-                case .candle:
-                    Rectangle()
-                        .fill(EllipticalGradient(
-                            stops: [
-                                .init(color: Color(rgb: 0xFFC46B), location: 0),
-                                .init(color: Color(rgb: 0xFF7D1A), location: 0.46),
-                                .init(color: Color(rgb: 0x6B2400), location: 1),
-                            ],
-                            center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5))
-                        .frame(width: w * 1.6, height: h * 2.6)
-                        .position(x: w * 0.5, y: h * 1.15)
-                        .opacity(Self.flicker(t, period: on ? 1.8 : 2.6))
-                case .music:
-                    MusicBars(t: t, fast: on)
-                case .rainbow, .palette:
-                    // Farbverlauf, der endlos nach links durchläuft
-                    let period = on ? 4.0 : 10.0
-                    let p = t.truncatingRemainder(dividingBy: period) / period
-                    LinearGradient(colors: Self.loop(flow.previewStops), startPoint: .leading, endPoint: .trailing)
-                        .frame(width: w * 2, height: h)
-                        .offset(x: -w * CGFloat(p))
-                }
-                // Glanz von oben, Schatten unten
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.white.opacity(0.16), location: 0),
-                        .init(color: Color.white.opacity(0), location: 0.42),
-                        .init(color: Color.black.opacity(0.28), location: 1),
-                    ],
-                    startPoint: .top, endPoint: .bottom)
-            }
-            .frame(width: w, height: h, alignment: .topLeading)
-            .clipped()
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    /// Zwei Durchläufe hintereinander, damit die Verschiebung um einen Durchlauf nahtlos ist
-    private static func loop(_ stops: [RGB]) -> [Color] {
-        let once = stops.map { $0.color }
-        guard let first = once.first else { return [.black, .black] }
-        return once + once + [first]
-    }
-
-    /// Unruhiges Flackern der Kerze (Helligkeit über einen Durchlauf)
-    private static func flicker(_ t: Double, period: Double) -> Double {
-        let keys: [(Double, Double)] = [(0, 0.78), (0.18, 1), (0.31, 0.6), (0.47, 0.92), (0.63, 0.7), (0.82, 0.98), (1, 0.78)]
-        let p = t.truncatingRemainder(dividingBy: period) / period
-        for i in 1..<keys.count where p <= keys[i].0 {
-            let a = keys[i - 1]
-            let b = keys[i]
-            let k = ColorMath.ease((p - a.0) / (b.0 - a.0))
-            return a.1 + (b.1 - a.1) * k
-        }
-        return 0.78
-    }
-}
-
-/// Vorschau des Musik-Modus: bunte Balken, die auf und ab springen
-struct MusicBars: View {
-    let t: Double
-    let fast: Bool
-
-    var body: some View {
-        let speed = fast ? 1.6 : 0.8
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(0..<12, id: \.self) { i in
-                let x = Double(i)
-                let a = sin(t * speed * 5.1 + x * 0.9)
-                let b = sin(t * speed * 3.3 + x * 1.7)
-                let level = 0.25 + 0.75 * abs(a * 0.6 + b * 0.4)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(ColorMath.hsv((x / 12 * 300 + t * 20).truncatingRemainder(dividingBy: 360), 1, 1).color)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .scaleEffect(x: 1, y: CGFloat(level), anchor: .bottom)
-            }
-        }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 6)
-    }
-}
-
-/// Drei tanzende Balken neben dem Namen des laufenden Effekts
-struct EqBars: View {
-    let t: Double
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(0..<3, id: \.self) { i in
-                let wave = cos((t + Double(i) * 0.3) * 2 * Double.pi / 0.9)
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Theme.accent)
-                    .frame(width: 3, height: 12)
-                    .scaleEffect(x: 1, y: CGFloat(0.625 - 0.375 * wave), anchor: .bottom)
-            }
-        }
-        .frame(height: 12)
     }
 }
 
@@ -503,50 +508,32 @@ struct SceneCard: View {
         return Flow.all.first { $0.id == id }
     }
 
-    private var fill: AnyShapeStyle {
-        if let flow {
-            let stops = flow.previewStops
-            if stops.count > 1 {
-                return AnyShapeStyle(LinearGradient(colors: stops.map { $0.color }, startPoint: .topLeading, endPoint: .bottomTrailing))
-            }
-            if flow.kind == .candle {
-                return AnyShapeStyle(LinearGradient(colors: [Color(rgb: 0xFFC46B), Color(rgb: 0xFF7D1A), Color(rgb: 0x6B2400)],
-                                                    startPoint: .top, endPoint: .bottom))
-            }
-        }
-        return AnyShapeStyle(scene.color.color)
-    }
-
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(fill)
-                    .overlay {
-                        LinearGradient(colors: [Color.white.opacity(0.18), Color.clear, Color.black.opacity(0.25)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                    }
-                    .frame(height: 52)
-                Spacer(minLength: 8)
+            VStack(alignment: .leading, spacing: 10) {
+                if let flow {
+                    EffectLEDs(flow: flow, base: scene.color, active: on, dot: 5, gap: 4)
+                } else {
+                    LEDPanel(colors: [scene.color], live: true, brightness: scene.brightness, dot: 5, gap: 4)
+                }
                 Text(scene.name)
-                    .font(.geist(14, 600))
+                    .font(.geist(15, 600))
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
-                Text(flow.map { "\($0.name) · \(scene.brightness) %" } ?? "\(scene.brightness) %")
-                    .font(.geist(11, 400))
-                    .foregroundStyle(Theme.muted)
+                Text((flow.map { "\($0.name) · " } ?? "") + "\(scene.brightness) %")
+                    .font(.geistMono(10, 500))
+                    .tracking(0.8)
+                    .foregroundStyle(on ? Theme.accent : Theme.muted)
                     .lineLimit(1)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
-            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 8))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Theme.accent : Theme.soft, lineWidth: Theme.border)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(on ? Theme.accent : Theme.hair, lineWidth: 1)
             }
-            .shadow(color: scene.color.color.opacity(on ? 0.45 : 0), radius: 12)
         }
-        .buttonStyle(PressStyle())
+        .buttonStyle(PressStyle(scale: 0.97))
         .accessibilityLabel("Szene \(scene.name)")
     }
 }

@@ -1,60 +1,77 @@
 import SwiftUI
 
-/// Hauptmenü: alle eigenen Lichter als leuchtende Karten, „Alle Lichter“ und Hinzufügen
+/// Hauptmenü: Zähler, „Alle Lichter“ und jedes Licht als Zeile mit LED-Reihe und Schalter
 struct HomeView: View {
     @Environment(LightController.self) private var light
     @Environment(Navigator.self) private var nav
     @State private var adding = false
 
-    private static let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-
-    /// Begrüßung je nach Tageszeit
-    private static var greeting: String {
-        switch Calendar.current.component(.hour, from: Date()) {
-        case 5..<11: return "Guten Morgen"
-        case 11..<17: return "Hallo"
-        case 17..<23: return "Guten Abend"
-        default: return "Gute Nacht"
+    private var statusLine: String {
+        let hub = light.hub
+        if light.demo && hub.mine.isEmpty { return "Vorführmodus" }
+        switch hub.bluetooth {
+        case .off: return "Bluetooth aus"
+        case .denied: return "Bluetooth nicht erlaubt"
+        case .unsupported: return "Kein Bluetooth"
+        case .starting: return "Startet"
+        case .ready: break
         }
-    }
-
-    /// Farben aller eingeschalteten Lichter für das Farblicht im Hintergrund
-    private var auroraColors: [Color] {
-        let lit = light.hub.mine.filter { $0.state == .on && light.lookOf(.light($0.id)).power != false }
-        if lit.isEmpty { return [light.glow(.all).color] }
-        return lit.map { light.glow(.light($0.id)).color }
+        let on = hub.targets.count
+        if on > 0 { return "\(on) verbunden" }
+        if hub.mine.contains(where: { $0.state == .busy }) || !hub.setupDone { return "Sucht" }
+        return "Nicht verbunden"
     }
 
     var body: some View {
         let hub = light.hub
         let mine = hub.mine
         Page {
+            // Kopfzeile
             HStack(spacing: 10) {
+                Rectangle()
+                    .fill(Theme.accent)
+                    .frame(width: 10, height: 10)
+                HStack(spacing: 0) {
+                    Text("LED").foregroundStyle(Theme.text)
+                    Text("CONTROL").foregroundStyle(Theme.accent)
+                }
+                .font(.geistMono(14, 700))
+                .tracking(2.2)
                 Spacer()
-                CircleIconButton(icon: .plus, label: "Licht hinzufügen") { adding = true }
-                CircleIconButton(icon: .sliders, label: "Einstellungen") { nav.path.append(.settings) }
+                SquareIconButton(icon: .plus, label: "Licht hinzufügen") { adding = true }
+                SquareIconButton(icon: .sliders, label: "Einstellungen") { nav.path.append(.settings) }
             }
             .padding(.top, 4)
 
-            HeroView(target: .all)
-                .padding(.top, -26)
-
-            Text(Self.greeting)
-                .font(.geist(15, 500))
-                .foregroundStyle(Theme.text.opacity(0.85))
-                .padding(.bottom, 6)
-
-            HStack(spacing: 10) {
-                StatusDot(state: light.link)
-                Text(light.status)
-                    .font(.geist(13, 400))
-                    .foregroundStyle(light.link == .on ? Theme.text : Theme.muted)
+            // Großanzeige
+            HStack(alignment: .lastTextBaseline, spacing: 12) {
+                Text(String(format: "%02d", mine.count))
+                    .font(.geistMono(72, 600))
+                    .foregroundStyle(Theme.text)
+                    .contentTransition(.numericText(value: Double(mine.count)))
+                    .animation(.snappy, value: mine.count)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(mine.count == 1 ? "LICHT" : "LICHTER")
+                        .font(.geistMono(14, 700))
+                        .tracking(2)
+                        .foregroundStyle(Theme.text)
+                    HStack(spacing: 7) {
+                        StatusLED(state: light.link)
+                        Text(statusLine.uppercased())
+                            .font(.geistMono(11, 500))
+                            .tracking(1.2)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.bottom, 20)
+            .padding(.top, 22)
+            .padding(.bottom, 6)
+            .rise(0)
 
-            UpdateBanner().rise(0)
+            UpdateBanner().rise(1)
 
-            if hub.bluetooth != .ready && !light.demo {
+            if hub.bluetooth != .ready && hub.bluetooth != .starting && !light.demo {
                 BluetoothProblem(state: hub.bluetooth).rise(1)
             }
 
@@ -62,29 +79,24 @@ struct HomeView: View {
                 EmptyHome(adding: $adding).rise(2)
             } else {
                 if mine.count > 1 || light.demo {
-                    AllLightsCard()
-                        .padding(.top, 4)
+                    AllLightsPanel()
+                        .padding(.top, 14)
                         .rise(2)
                 }
                 SectionTitle("Meine Lichter").rise(3)
-                LazyVGrid(columns: Self.columns, spacing: 12) {
+                VStack(spacing: 10) {
                     ForEach(mine) { item in
-                        LightCard(item: item)
+                        LightRow(item: item)
                     }
-                    AddCard { adding = true }
+                    AddRow { adding = true }
                 }
                 .rise(4)
-                Hint(text: "Antippen zum Steuern, gedrückt halten für Umbenennen, Blinken und Entfernen.")
+                Hint(text: "Antippen zum Steuern. Gedrückt halten: blinken lassen, umbenennen, entfernen.")
                     .padding(.top, 12)
                     .rise(5)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .background(alignment: .top) {
-            AuroraGlow(colors: auroraColors, live: light.isLive(.all) || light.hub.hasTargets)
-                .frame(height: 620)
-                .ignoresSafeArea()
-        }
         .pageBackground()
         .sheet(isPresented: $adding) {
             AddLightSheet()
@@ -93,66 +105,67 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Karten
+// MARK: - Alle Lichter
 
-/// Großes Feld für alle Lichter zusammen; zeigt die Farben aller Lichter nebeneinander
-private struct AllLightsCard: View {
+/// Paneel für alle Lichter: jedes Licht als eigener Abschnitt in der LED-Reihe
+private struct AllLightsPanel: View {
     @Environment(LightController.self) private var light
     @Environment(Navigator.self) private var nav
+
+    /// Zeile unter dem Titel, z. B. „2/2 VERBUNDEN · POLARLICHT · WELLE“
+    private static func info(lights: Int, connected: Int, effect: String?, wave: Bool) -> String {
+        var parts = [lights == 0 ? "Vorführmodus" : "\(connected)/\(lights) verbunden"]
+        if let effect {
+            parts.append(effect)
+            if wave && lights > 1 { parts.append("Welle") }
+        }
+        return parts.joined(separator: " · ").uppercased()
+    }
 
     var body: some View {
         let lights = light.lightsOf(.all)
         let live = light.isLive(.all)
         let colors = lights.isEmpty ? [light.glow(.all)] : lights.map { light.glow(.light($0.id)) }
         let connected = lights.filter { $0.state == .on }.count
+        let look = light.lookOf(.all)
+        let effect = look.flowID.flatMap { id in Flow.everything.first { $0.id == id }?.name }
+        let info = Self.info(lights: lights.count, connected: connected, effect: effect, wave: light.wave)
         Button {
             nav.path.append(.control(.all))
         } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    ForEach(Array(colors.prefix(4).enumerated()), id: \.offset) { i, c in
-                        LampBadge(color: c, live: live, size: 26)
-                            .offset(x: CGFloat(i) * 14)
-                    }
-                }
-                .frame(width: 26 + CGFloat(max(min(colors.count, 4) - 1, 0)) * 14, alignment: .leading)
-                VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text("Alle Lichter")
-                        .font(.geist(17, 600))
+                        .font(.geist(20, 600))
                         .foregroundStyle(Theme.text)
-                    Text(light.demo && lights.isEmpty ? "Vorführmodus" : "\(connected) von \(lights.count) verbunden")
-                        .font(.geist(12, 400))
-                        .foregroundStyle(Theme.muted)
+                    Text(info)
+                        .font(.geistMono(11, 500))
+                        .tracking(1)
+                        .foregroundStyle(effect != nil ? Theme.accent : Theme.muted)
+                        .lineLimit(1)
                 }
-                Spacer(minLength: 8)
-                Icon(kind: .chevron, size: 15, color: Theme.muted)
-                    .rotationEffect(.degrees(-90))
-                    .padding(.trailing, 46)
+                .padding(.trailing, 70)
+                LEDPanel(colors: colors, live: live, brightness: look.brightness, rows: 2, dot: 7, gap: 5)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 74)
-            .background {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Theme.tile)
-                    .overlay {
-                        LinearGradient(colors: colors.map { $0.color.opacity(live ? 0.28 : 0.06) }, startPoint: .leading, endPoint: .trailing)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 10).strokeBorder(live ? Theme.accent.opacity(0.8) : Theme.soft, lineWidth: Theme.border)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(live ? Theme.accent.opacity(0.6) : Theme.hair, lineWidth: 1)
             }
         }
-        .buttonStyle(PressStyle(scale: 0.98))
-        .overlay(alignment: .trailing) {
-            PowerToggle(target: .all)
-                .padding(.trailing, 14)
+        .buttonStyle(PressStyle(scale: 0.985))
+        .overlay(alignment: .topTrailing) {
+            PowerSwitch(target: .all)
+                .padding(14)
         }
     }
 }
 
-/// Karte für ein Licht: leuchtet in seiner Farbe, Knopf zum Ein- und Ausschalten
-private struct LightCard: View {
+// MARK: - Ein Licht
+
+/// Zeile für ein Licht: Status-LED, Name, Typ und Empfang, LED-Reihe in der echten Farbe, Schalter
+private struct LightRow: View {
     let item: Light
 
     @Environment(LightController.self) private var light
@@ -161,12 +174,12 @@ private struct LightCard: View {
     @State private var newName = ""
     @State private var confirmRemove = false
 
-    private var statusLine: String {
+    private var stateText: String {
         let t = Target.light(item.id)
         if !item.enabled { return "Getrennt" }
         switch item.state {
         case .busy:
-            return item.rssi == nil ? "Nicht in Reichweite" : "Verbindet …"
+            return item.rssi == nil ? "Nicht in Reichweite" : "Verbindet"
         case .off:
             return "Getrennt"
         case .on:
@@ -174,69 +187,55 @@ private struct LightCard: View {
             if look.power == false { return "Aus" }
             if let id = look.flowID, let flow = Flow.everything.first(where: { $0.id == id }) { return flow.name }
             if look.builtin != nil { return "Eingebauter Effekt" }
-            return "An · \(look.brightness) %"
+            return "\(look.brightness) %"
         }
     }
 
     var body: some View {
         let t = Target.light(item.id)
         let live = light.isLive(t)
-        let glow = light.glow(t)
+        let look = light.lookOf(t)
+        let running = live && (look.flowID != nil || look.builtin != nil)
         Button {
             nav.path.append(.control(t))
         } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 8) {
-                    LampBadge(color: glow, live: live, size: 34)
-                    PixelBadge(kind: item.model.pixels)
-                        .padding(.top, 4)
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        StatusLED(state: item.enabled ? item.state : .off)
+                        Text(item.title)
+                            .font(.geist(20, 600))
+                            .foregroundStyle(Theme.text)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    HStack(spacing: 8) {
+                        PixelBadge(kind: item.model.pixels)
+                        Text("\(item.name) · \(stateText)".uppercased())
+                            .font(.geistMono(11, 500))
+                            .tracking(0.8)
+                            .foregroundStyle(running ? Theme.accent : Theme.muted)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if item.state == .on || item.rssi != nil {
+                            SignalBars(rssi: item.rssi)
+                        }
+                    }
                 }
-                .padding(.top, 2)
-                Spacer(minLength: 14)
-                Text(item.title)
-                    .font(.geist(16, 600))
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                HStack(spacing: 6) {
-                    if item.state == .busy && item.enabled { SearchingMark().scaleEffect(0.8) }
-                    Text(statusLine)
-                        .font(.geist(12, 400))
-                        .foregroundStyle(item.state == .on ? Theme.text.opacity(0.75) : Theme.muted)
-                        .lineLimit(1)
-                }
-                .padding(.top, 3)
-                LightStrip(colors: [glow.color], live: live, height: 5)
-                    .padding(.top, 12)
+                .padding(.trailing, 70)
+                LEDPanel(colors: [light.glow(t)], live: live, brightness: look.brightness, dot: 7, gap: 5)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
-            .background {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Theme.tile)
-                    .overlay {
-                        RadialGradient(colors: [glow.color.opacity(live ? 0.42 : 0), .clear],
-                                       center: .topLeading, startRadius: 0, endRadius: 170)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(live ? glow.color.opacity(0.75) : Theme.soft, lineWidth: Theme.border)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(live ? Theme.accent.opacity(0.6) : Theme.hair, lineWidth: 1)
             }
-            .overlay {
-                // Läuft ein Effekt, umkreist ein Lichtstreifen in der Farbe des Lichts die Karte
-                if live && light.lookOf(t).flowID != nil {
-                    ScanBorder(radius: 10, color: glow.color, period: 2.6, width: 2)
-                }
-            }
-            .shadow(color: glow.color.opacity(live ? 0.35 : 0), radius: 16)
-            .animation(.easeOut(duration: 0.4), value: live)
         }
-        .buttonStyle(PressStyle())
+        .buttonStyle(PressStyle(scale: 0.985))
         .overlay(alignment: .topTrailing) {
-            PowerToggle(target: t)
-                .padding(10)
+            PowerSwitch(target: t)
+                .padding(14)
         }
         .contextMenu {
             Button {
@@ -278,55 +277,31 @@ private struct LightCard: View {
     }
 }
 
-/// Runder Ein/Aus-Knopf; gelb, wenn das Licht an ist
-struct PowerToggle: View {
-    let target: Target
-
-    @Environment(LightController.self) private var light
-
-    var body: some View {
-        let usable = light.demo || light.isConnected(target)
-        let on = usable && light.lookOf(target).power != false
-        Button {
-            light.setPower(!on, for: target)
-        } label: {
-            Icon(kind: .power, size: 16, color: on ? Color(rgb: 0x14130E) : Theme.text)
-                .frame(width: 36, height: 36)
-                .background(on ? Theme.accent : Theme.fill, in: Circle())
-                .overlay { Circle().strokeBorder(on ? Theme.accent : Theme.line.opacity(0.5), lineWidth: Theme.border) }
-                .shadow(color: Theme.accent.opacity(on ? 0.5 : 0), radius: 8)
-        }
-        .buttonStyle(PressStyle(scale: 0.88))
-        .disabled(!usable)
-        .opacity(usable ? 1 : 0.4)
-        .sensoryFeedback(.impact(weight: .medium), trigger: on)
-        .accessibilityLabel(on ? "Ausschalten" : "Einschalten")
-    }
-}
-
-private struct AddCard: View {
+private struct AddRow: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
-                Icon(kind: .plus, size: 24, color: Theme.accent)
-                Text("Licht hinzufügen")
-                    .font(.geist(14, 500))
+            HStack(spacing: 12) {
+                Icon(kind: .plus, size: 16, color: Theme.accent)
+                Text("LICHT HINZUFÜGEN")
+                    .font(.geistMono(12, 600))
+                    .tracking(1.6)
                     .foregroundStyle(Theme.text)
+                Spacer()
             }
-            .frame(maxWidth: .infinity, minHeight: 160)
-            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(Theme.bg.opacity(0.6), in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Theme.line.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1)
             }
         }
-        .buttonStyle(PressStyle())
+        .buttonStyle(PressStyle(scale: 0.985))
     }
 }
 
-/// Noch kein Licht: Hinweis, Hinzufügen und Vorführmodus
+/// Noch kein Licht: Suche, Hinzufügen und Vorführmodus
 private struct EmptyHome: View {
     @Binding var adding: Bool
 
@@ -334,17 +309,20 @@ private struct EmptyHome: View {
 
     var body: some View {
         let searching = !light.hub.setupDone && light.hub.bluetooth == .ready
-        VStack(spacing: 14) {
-            Icon(kind: .lamp, size: 34, color: Theme.accent)
-            Text(searching ? "Suche deine LED-Leiste …" : "Noch kein Licht")
-                .font(.geist(18, 600))
+        VStack(alignment: .leading, spacing: 14) {
+            if searching {
+                ScannerLEDs()
+            } else {
+                LEDPanel(colors: [RGB(255, 210, 63)], live: false, rows: 1)
+            }
+            Text(searching ? "Suche deine LED-Leiste" : "Noch kein Licht")
+                .font(.geist(20, 600))
                 .foregroundStyle(Theme.text)
             Text(searching
                  ? "Die erste ELK-Leiste in der Nähe übernimmt die App automatisch. Andere Licht-Apps vorher ganz schließen."
                  : "Licht einschalten, in die Nähe gehen und andere Licht-Apps ganz schließen. Dann hier hinzufügen.")
                 .font(.geist(13, 400))
                 .foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
                 .lineSpacing(2)
             Button {
                 adding = true
@@ -359,23 +337,12 @@ private struct EmptyHome: View {
             Button {
                 withAnimation(.easeOut(duration: 0.3)) { light.setDemo(true) }
             } label: {
-                HStack(spacing: 8) {
-                    Icon(kind: .sparkle, size: 15)
-                    Text("Ohne Licht ausprobieren")
-                }
+                Text("Ohne Licht ausprobieren")
             }
             .buttonStyle(OutlineButtonStyle())
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(Theme.tile, in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.soft, lineWidth: Theme.border)
-        }
-        .overlay {
-            if searching { ScanBorder(radius: 10) }
-        }
-        .padding(.top, 8)
+        .tile()
+        .padding(.top, 14)
     }
 }
 
@@ -391,27 +358,22 @@ struct UpdateBanner: View {
                 nav.path.append(.settings)
             } label: {
                 HStack(spacing: 12) {
-                    Icon(kind: .download, size: 20, color: Theme.accent)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Update \(release.version) verfügbar")
+                    Icon(kind: .download, size: 18, color: Theme.ink)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Update \(release.version)")
                             .font(.geist(15, 600))
-                            .foregroundStyle(Theme.text)
-                        Text("Antippen für die Anleitung")
-                            .font(.geist(12, 400))
-                            .foregroundStyle(Theme.muted)
+                        Text("ANTIPPEN FÜR DIE ANLEITUNG")
+                            .font(.geistMono(10, 600))
+                            .tracking(1)
                     }
+                    .foregroundStyle(Theme.ink)
                     Spacer(minLength: 0)
-                    Icon(kind: .chevron, size: 15, color: Theme.muted)
-                        .rotationEffect(.degrees(-90))
                 }
                 .padding(14)
-                .background(Theme.hot, in: RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.accent, lineWidth: Theme.border)
-                }
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
             }
             .buttonStyle(PressStyle(scale: 0.98))
-            .padding(.bottom, 12)
+            .padding(.top, 14)
         }
     }
 }

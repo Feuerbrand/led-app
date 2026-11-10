@@ -13,6 +13,16 @@ enum Theme {
     static let tile = Color(rgb: 0x161510, opacity: 0.9)
     static let hot = Color(rgb: 0x261F09, opacity: 0.82)
     static let border: CGFloat = 1.5
+    /// Hintergrund der Seiten
+    static let bg = Color(rgb: 0x0B0A07)
+    /// Flächen (Paneele) – flach, ohne Verlauf
+    static let panel = Color(rgb: 0x141310)
+    /// Haarlinie um Paneele
+    static let hair = Color.white.opacity(0.10)
+    /// Ausgeschaltete LED
+    static let ledOff = Color(rgb: 0x27251F)
+    /// Dunkle Schrift auf Gelb
+    static let ink = Color(rgb: 0x14130E)
     static let curve = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)
 }
 

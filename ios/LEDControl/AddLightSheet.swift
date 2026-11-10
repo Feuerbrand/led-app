@@ -11,18 +11,20 @@ struct AddLightSheet: View {
         NavigationStack {
             Group {
                 if let chosen {
-                    NameStep(item: chosen, name: $name, back: { withAnimation { self.chosen = nil } }) {
+                    NameStep(item: chosen, name: $name, back: { withAnimation(.snappy) { self.chosen = nil } }) {
                         light.add(chosen, name: name.isEmpty ? chosen.model.label : name)
                         dismiss()
                     }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 } else {
                     ListStep { item in
                         name = ""
-                        withAnimation(.easeOut(duration: 0.25)) { chosen = item }
+                        withAnimation(.snappy) { chosen = item }
                     }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
             }
-            .navigationTitle(chosen == nil ? "Licht hinzufügen" : "Name vergeben")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -50,82 +52,69 @@ private struct ListStep: View {
         let hub = light.hub
         let found = hub.nearby.sorted { ($0.rssi ?? -200) > ($1.rssi ?? -200) }
         Page {
-            HStack(spacing: 10) {
-                if hub.bluetooth == .ready { SearchingMark() }
-                Text(hub.bluetooth == .ready ? "Suche LED-Lichter in der Nähe …" : "Bluetooth ist nicht bereit")
-                    .font(.geist(14, 500))
-                    .foregroundStyle(Theme.text)
-                Spacer()
+            PageTitle(title: "Licht hinzufügen", subtitle: "Nur passende LED-Lichter in der Nähe")
+
+            VStack(alignment: .leading, spacing: 12) {
+                if hub.bluetooth == .ready {
+                    ScannerLEDs()
+                } else {
+                    LEDPanel(colors: [RGB(255, 210, 63)], live: false)
+                }
+                HStack(spacing: 8) {
+                    StatusLED(state: hub.bluetooth == .ready ? .busy : .off)
+                    Text((hub.bluetooth == .ready ? "Suche · \(found.count) gefunden" : "Bluetooth nicht bereit").uppercased())
+                        .font(.geistMono(11, 600))
+                        .tracking(1.2)
+                        .foregroundStyle(Theme.muted)
+                }
             }
-            .padding(.top, 12)
-            .padding(.horizontal, 4)
-            .padding(.bottom, 14)
+            .tile()
+            .padding(.top, 18)
 
             if hub.bluetooth != .ready {
                 BluetoothProblem(state: hub.bluetooth)
             }
 
             if found.isEmpty {
-                VStack(spacing: 12) {
-                    Clock { t in
-                        let p = (t.truncatingRemainder(dividingBy: 2.4)) / 2.4
-                        ZStack {
-                            ForEach(0..<3, id: \.self) { i in
-                                let k = (p + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                                Circle()
-                                    .strokeBorder(Theme.accent.opacity(0.6 * (1 - k)), lineWidth: 1.5)
-                                    .frame(width: 30 + 110 * k, height: 30 + 110 * k)
-                            }
-                            Icon(kind: .bluetooth, size: 22, color: Theme.accent)
-                        }
-                        .frame(height: 150)
-                    }
-                    Text("Noch nichts gefunden")
-                        .font(.geist(16, 600))
-                        .foregroundStyle(Theme.text)
-                    Text("Licht einschalten und in die Nähe gehen. Andere Licht-Apps (z. B. die App des Herstellers) vorher ganz schließen – ein Licht nimmt immer nur eine Verbindung an.")
-                        .font(.geist(13, 400))
-                        .foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(2)
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity)
-                .tile()
+                Hint(text: "Licht einschalten und in die Nähe gehen. Andere Licht-Apps (z. B. die App des Herstellers) vorher ganz schließen – ein Licht nimmt immer nur eine Verbindung an.")
+                    .padding(.top, 14)
             } else {
-                VStack(spacing: 10) {
+                SectionTitle("Gefunden")
+                VStack(spacing: 8) {
                     ForEach(found) { item in
                         Button {
                             choose(item)
                         } label: {
-                            HStack(spacing: 14) {
-                                LampBadge(color: RGB(255, 210, 63), live: true, size: 28)
-                                VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 5) {
                                     Text(item.name)
-                                        .font(.geist(16, 600))
+                                        .font(.geist(17, 600))
                                         .foregroundStyle(Theme.text)
                                         .lineLimit(1)
-                                    Text(item.model.known ? item.model.label : "Unbekannt – Versuch mit ELK-Befehlen")
-                                        .font(.geist(12, 400))
-                                        .foregroundStyle(Theme.muted)
-                                        .lineLimit(1)
+                                    HStack(spacing: 8) {
+                                        PixelBadge(kind: item.model.pixels)
+                                        Text((item.model.known ? item.model.label : "Unbekannt – Versuch mit ELK-Befehlen").uppercased())
+                                            .font(.geistMono(10, 500))
+                                            .tracking(0.8)
+                                            .foregroundStyle(Theme.muted)
+                                            .lineLimit(1)
+                                    }
                                 }
                                 Spacer(minLength: 8)
-                                PixelBadge(kind: item.model.pixels)
                                 SignalBars(rssi: item.rssi)
                                 Icon(kind: .plus, size: 18, color: Theme.accent)
                             }
                             .padding(14)
-                            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 10))
+                            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.soft, lineWidth: Theme.border)
+                                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1)
                             }
                         }
                         .buttonStyle(PressStyle(scale: 0.98))
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
-                .animation(.easeOut(duration: 0.3), value: found.map { $0.id })
+                .animation(.snappy, value: found.map { $0.id })
             }
 
             Toggle(isOn: Binding(get: { hub.showAll }, set: { hub.setShowAll($0) })) {
@@ -160,42 +149,34 @@ private struct NameStep: View {
 
     var body: some View {
         Page {
-            VStack(spacing: 10) {
-                LampBadge(color: RGB(255, 210, 63), live: true, size: 52)
-                    .padding(.top, 18)
-                Text("Wie soll das Licht heißen?")
-                    .font(.geist(20, 600))
-                    .foregroundStyle(Theme.text)
-                Text("\(item.name) · \(item.model.label)")
-                    .font(.geist(13, 400))
-                    .foregroundStyle(Theme.muted)
-            }
-            .padding(.bottom, 20)
+            PageTitle(title: "Wie soll es heißen?", subtitle: "\(item.name) · \(item.model.label)")
 
             TextField("", text: $name, prompt: Text(item.model.label).foregroundStyle(Theme.muted))
-                .font(.geist(18, 500))
+                .font(.geist(22, 600))
                 .foregroundStyle(Theme.text)
                 .focused($focused)
                 .submitLabel(.done)
                 .onSubmit(add)
                 .padding(.horizontal, 14)
-                .frame(height: 52)
-                .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8))
+                .frame(height: 58)
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 8).strokeBorder(focused ? Theme.accent : Theme.line, lineWidth: Theme.border)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(focused ? Theme.accent : Theme.hair, lineWidth: 1)
                 }
+                .padding(.top, 22)
 
             LazyVGrid(columns: Self.columns, spacing: 8) {
                 ForEach(Self.ideas, id: \.self) { idea in
+                    let on = name == idea
                     Button {
                         name = idea
                     } label: {
                         Text(idea)
                             .font(.geist(13, 500))
-                            .foregroundStyle(name == idea ? Color(rgb: 0x14130E) : Theme.text)
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                            .background(name == idea ? Theme.accent : Theme.fill, in: Capsule())
-                            .overlay { Capsule().strokeBorder(name == idea ? Theme.accent : Theme.soft, lineWidth: 1) }
+                            .foregroundStyle(on ? Theme.ink : Theme.text)
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .background(on ? Theme.accent : Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+                            .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(on ? Theme.accent : Theme.hair, lineWidth: 1) }
                     }
                     .buttonStyle(PressStyle(scale: 0.94))
                 }
@@ -209,12 +190,15 @@ private struct NameStep: View {
                 }
             }
             .buttonStyle(AccentButtonStyle())
-            .padding(.top, 24)
+            .padding(.top, 26)
 
-            Button("Anderes Licht wählen", action: back)
-                .font(.geist(14, 500))
-                .foregroundStyle(Theme.muted)
-                .padding(.top, 14)
+            Button(action: back) {
+                Text("ANDERES LICHT WÄHLEN")
+                    .font(.geistMono(11, 600))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.top, 16)
         }
         .onAppear { focused = true }
     }

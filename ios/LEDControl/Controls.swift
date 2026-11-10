@@ -23,15 +23,15 @@ struct Clock<Content: View>: View {
 
 // MARK: - Kacheln und Überschriften
 
-/// Kachel wie `.qt` auf der Webseite
+/// Paneel: flache Fläche mit Haarlinie, kantige Ecken
 struct Tile: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 8))
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
             .overlay {
-                RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.soft, lineWidth: Theme.border)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1)
             }
     }
 }
@@ -46,8 +46,7 @@ struct Rise: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .scaleEffect(shown ? 1 : 0.98)
-            .offset(y: shown ? 0 : 18)
+            .offset(y: shown ? 0 : 12)
             .onAppear {
                 if shown { return }
                 if still {
@@ -81,12 +80,20 @@ struct SectionTitle: View {
     }
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.geist(11, 600))
-            .tracking(1.3)
-            .foregroundStyle(Theme.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(EdgeInsets(top: 24, leading: 4, bottom: 10, trailing: 0))
+        HStack(spacing: 8) {
+            Rectangle()
+                .fill(Theme.accent)
+                .frame(width: 6, height: 6)
+            Text(text.uppercased())
+                .font(.geistMono(11, 600))
+                .tracking(1.8)
+                .foregroundStyle(Theme.muted)
+            Rectangle()
+                .fill(Theme.hair)
+                .frame(height: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(EdgeInsets(top: 26, leading: 2, bottom: 12, trailing: 0))
     }
 }
 
@@ -137,7 +144,7 @@ struct OutlineButtonStyle: ButtonStyle {
         var body: some View {
             let hot = on || pressed
             label
-                .font(.geist(16, 500))
+                .font(.geist(15, 500))
                 .foregroundStyle(Theme.text)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -146,9 +153,9 @@ struct OutlineButtonStyle: ButtonStyle {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, minHeight: 46)
-                .background(hot ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 5))
+                .background(hot ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 4))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 5).strokeBorder(hot ? Theme.accent : Theme.line, lineWidth: Theme.border)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(hot ? Theme.accent : Theme.line.opacity(0.55), lineWidth: 1)
                 }
                 .contentShape(Rectangle())
                 .scaleEffect(pressed ? 0.96 : 1)
