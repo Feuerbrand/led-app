@@ -8,6 +8,23 @@ struct HomeView: View {
 
     private static let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
+    /// Begrüßung je nach Tageszeit
+    private static var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<11: return "Guten Morgen"
+        case 11..<17: return "Hallo"
+        case 17..<23: return "Guten Abend"
+        default: return "Gute Nacht"
+        }
+    }
+
+    /// Farben aller eingeschalteten Lichter für das Farblicht im Hintergrund
+    private var auroraColors: [Color] {
+        let lit = light.hub.mine.filter { $0.state == .on && light.lookOf(.light($0.id)).power != false }
+        if lit.isEmpty { return [light.glow(.all).color] }
+        return lit.map { light.glow(.light($0.id)).color }
+    }
+
     var body: some View {
         let hub = light.hub
         let mine = hub.mine
@@ -21,6 +38,11 @@ struct HomeView: View {
 
             HeroView(target: .all)
                 .padding(.top, -26)
+
+            Text(Self.greeting)
+                .font(.geist(15, 500))
+                .foregroundStyle(Theme.text.opacity(0.85))
+                .padding(.bottom, 6)
 
             HStack(spacing: 10) {
                 StatusDot(state: light.link)
@@ -58,6 +80,11 @@ struct HomeView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .background(alignment: .top) {
+            AuroraGlow(colors: auroraColors, live: light.isLive(.all) || light.hub.hasTargets)
+                .frame(height: 620)
+                .ignoresSafeArea()
+        }
         .pageBackground()
         .sheet(isPresented: $adding) {
             AddLightSheet()
@@ -159,8 +186,12 @@ private struct LightCard: View {
             nav.path.append(.control(t))
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                LampBadge(color: glow, live: live, size: 34)
-                    .padding(.top, 2)
+                HStack(alignment: .top, spacing: 8) {
+                    LampBadge(color: glow, live: live, size: 34)
+                    PixelBadge(kind: item.model.pixels)
+                        .padding(.top, 4)
+                }
+                .padding(.top, 2)
                 Spacer(minLength: 14)
                 Text(item.title)
                     .font(.geist(16, 600))
@@ -175,9 +206,11 @@ private struct LightCard: View {
                         .lineLimit(1)
                 }
                 .padding(.top, 3)
+                LightStrip(colors: [glow.color], live: live, height: 5)
+                    .padding(.top, 12)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Theme.tile)
@@ -190,6 +223,12 @@ private struct LightCard: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(live ? glow.color.opacity(0.75) : Theme.soft, lineWidth: Theme.border)
+            }
+            .overlay {
+                // Läuft ein Effekt, umkreist ein Lichtstreifen in der Farbe des Lichts die Karte
+                if live && light.lookOf(t).flowID != nil {
+                    ScanBorder(radius: 10, color: glow.color, period: 2.6, width: 2)
+                }
             }
             .shadow(color: glow.color.opacity(live ? 0.35 : 0), radius: 16)
             .animation(.easeOut(duration: 0.4), value: live)
@@ -276,7 +315,7 @@ private struct AddCard: View {
                     .font(.geist(14, 500))
                     .foregroundStyle(Theme.text)
             }
-            .frame(maxWidth: .infinity, minHeight: 148)
+            .frame(maxWidth: .infinity, minHeight: 160)
             .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10))
             .overlay {
                 RoundedRectangle(cornerRadius: 10)

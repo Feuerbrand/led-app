@@ -117,6 +117,24 @@ enum EffectFamily: String, CaseIterable {
     }
 }
 
+/// Ob die LEDs einer Leiste einzeln angesteuert werden können
+enum PixelKind {
+    /// RGBIC / WS2812B: Effekte können die Leiste entlanglaufen
+    case addressable
+    /// Normale RGB-Leiste: alle LEDs zeigen immer dieselbe Farbe
+    case singleColor
+    /// Bei dieser Bauart nicht sicher bekannt
+    case unknown
+
+    var badge: String? {
+        switch self {
+        case .addressable: return "RGBIC"
+        case .singleColor: return "RGB"
+        case .unknown: return nil
+        }
+    }
+}
+
 /// Bauart eines Lichts: an welchem Namen man es erkennt und welche Bytes es versteht.
 ///
 /// Die ELK-Leiste benutzt genau die Befehle aus index.html. Die MELK-Varianten (die Lichter,
@@ -142,6 +160,15 @@ struct LightModel {
 
     /// false = Gerät mit unbekanntem Namen, die App versucht es mit den ELK-Befehlen
     var known: Bool { !prefix.isEmpty }
+
+    /// Was die LEDs können: einzeln steuerbar (Lauflicht entlang der Leiste) oder alle in einer Farbe
+    var pixels: PixelKind {
+        switch family {
+        case .stripX: return .addressable
+        case .elk: return .singleColor
+        case .melk, .melkOx: return .unknown
+        }
+    }
 
     func color(_ c: RGB) -> [UInt8] {
         Command.color(c)                    // bei allen unterstützten Bauarten gleich

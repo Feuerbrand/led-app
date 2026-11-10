@@ -111,6 +111,7 @@ private struct ListStep: View {
                                         .lineLimit(1)
                                 }
                                 Spacer(minLength: 8)
+                                PixelBadge(kind: item.model.pixels)
                                 SignalBars(rssi: item.rssi)
                                 Icon(kind: .plus, size: 18, color: Theme.accent)
                             }

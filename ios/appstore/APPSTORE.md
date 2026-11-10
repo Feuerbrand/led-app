@@ -32,22 +32,24 @@ Deine LED-Leiste, endlich richtig gesteuert: weiche Farbverläufe, Musik-Modus, 
 ```
 Steuere deine Bluetooth-LED-Leisten direkt vom iPhone – schnell, schön und ohne Umwege.
 
-LED Control verbindet sich von selbst mit deinen Lichtern und steuert mehrere gleichzeitig. Alles leuchtet in derselben Farbe und mit denselben Effekten.
+LED Control verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü leuchtet jedes Licht als Karte in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
 
 LICHT
-• An/Aus und Helligkeit
-• Farbe aus dem Farbwähler, über Farbton- und Weißton-Leiste oder 12 Farbfelder
+• An/Aus und Helligkeit, für jedes Licht einzeln oder alle zusammen
+• Farbrad, Weißton-Leiste und 12 Farbfelder
 • Szenen speichern und mit einem Tippen abrufen
 
 EFFEKTE
 • Acht fließende Effekte: Regenbogen, Polarlicht, Sonnenuntergang, Ozean, Lava, Neon, Atmen und Kerzenschein – weich überblendet, ohne Sprünge
+• Welle: Bei mehreren Lichtern wandert die Farbe von Licht zu Licht
 • Musik-Modus: Die Lichter pulsieren im Takt deiner Musik. Die App misst nur die Lautstärke, es wird nichts aufgenommen.
 • Tempo frei einstellbar
 • Dazu die eingebauten Effekte deiner Lichter
 
-GERÄTE
-• Mehrere Lichter gleichzeitig, mit Status und Empfangsstärke
-• Lichter umbenennen, blinken lassen, verbinden und trennen
+LICHTER
+• Neue Lichter mit einem Tippen hinzufügen – es werden nur passende LED-Lichter angezeigt
+• Eigene Namen wie „Wohnzimmer“ oder „Bett“
+• Blinken lassen, umbenennen, verbinden und trennen
 • Verbindet sich nach Abbrüchen von selbst neu
 
 SIRI UND KURZBEFEHLE
@@ -87,7 +89,7 @@ https://github.com/Feuerbrand/led-app/blob/main/ios/SUPPORT.md
 ```
 LED Control controls Bluetooth LE LED strips and lamps (controllers that advertise as "ELK-BLEDOM" or "MELK", GATT service FFF0).
 
-No hardware? Every feature can be tried in demo mode: on the first tab ("Licht") tap "Ohne Licht ausprobieren" (try without a light), or switch on "Vorführmodus" in the "Geräte" tab. All controls, effects, scenes and settings then work without a connected light.
+No hardware? Every feature can be tried in demo mode: on the home screen tap "Ohne Licht ausprobieren" (try without a light), or open the settings (slider icon, top right) and switch on "Vorführmodus". Then tap "Alle Lichter" – all controls, effects and scenes work without a connected light.
 
 Video of the app controlling a real LED strip: [LINK ZUM VIDEO]
 

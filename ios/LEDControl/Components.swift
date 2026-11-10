@@ -93,9 +93,12 @@ struct StatusDot: View {
     }
 }
 
-/// Laufender Lichtstreifen um eine Kachel, solange gesucht oder verbunden wird
+/// Laufender Lichtstreifen um eine Kachel: beim Suchen gelb, bei laufenden Effekten in der Farbe des Lichts
 struct ScanBorder: View {
     var radius: CGFloat = 8
+    var color: Color = Theme.accent
+    var period: Double = 1.5
+    var width: CGFloat = Theme.border
 
     var body: some View {
         Clock { t in
@@ -103,16 +106,73 @@ struct ScanBorder: View {
                 .strokeBorder(
                     AngularGradient(
                         stops: [
-                            .init(color: Theme.accent.opacity(0), location: 0),
-                            .init(color: Theme.accent.opacity(0), location: 0.6),
-                            .init(color: Theme.accent, location: 0.92),
-                            .init(color: Theme.accent.opacity(0), location: 1),
+                            .init(color: color.opacity(0), location: 0),
+                            .init(color: color.opacity(0), location: 0.6),
+                            .init(color: color, location: 0.92),
+                            .init(color: color.opacity(0), location: 1),
                         ],
                         center: .center,
-                        angle: .degrees((t / 1.5 * 360).truncatingRemainder(dividingBy: 360))),
-                    lineWidth: Theme.border)
+                        angle: .degrees((t / period * 360).truncatingRemainder(dividingBy: 360))),
+                    lineWidth: width)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Weiches, langsam wanderndes Farblicht aus den Farben der Lichter (Hintergrund im Hauptmenü)
+struct AuroraGlow: View {
+    let colors: [Color]
+    let live: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var still
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            Canvas { context, size in
+                let list = colors.isEmpty ? [Theme.accent] : colors
+                let n = max(list.count, 3)
+                let r = Double(max(size.width, size.height)) * 0.5
+                context.blendMode = .screen
+                for i in 0..<n {
+                    let c = list[i % list.count]
+                    let phase = Double(i) / Double(n) * 2 * Double.pi
+                    let x = Double(size.width) * (0.5 + 0.36 * cos(t * 0.11 + phase))
+                    let y = Double(size.height) * (0.28 + 0.16 * sin(t * 0.15 + phase * 1.3))
+                    let glow = Gradient(colors: [c.opacity(live ? 0.30 : 0.07), c.opacity(0)])
+                    context.fill(
+                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                        with: .radialGradient(glow, center: CGPoint(x: x, y: y), startRadius: 0, endRadius: CGFloat(r)))
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// Leuchtende „LED-Leiste“ in den aktuellen Farben (eine Farbe oder mehrere nebeneinander)
+struct LightStrip: View {
+    let colors: [Color]
+    let live: Bool
+    var height: CGFloat = 6
+
+    var body: some View {
+        let list = colors.isEmpty ? [Theme.accent] : colors
+        let fill: AnyShapeStyle = live
+            ? AnyShapeStyle(LinearGradient(colors: list.count == 1 ? [list[0], list[0]] : list, startPoint: .leading, endPoint: .trailing))
+            : AnyShapeStyle(Color.white.opacity(0.12))
+        Capsule()
+            .fill(fill)
+            .overlay {
+                Capsule()
+                    .fill(Color.white.opacity(live ? 0.35 : 0))
+                    .frame(height: max(height * 0.3, 1))
+                    .blur(radius: 0.5)
+            }
+            .frame(height: height)
+            .shadow(color: list[0].opacity(live ? 0.9 : 0), radius: height * 1.3)
+            .shadow(color: list[list.count - 1].opacity(live ? 0.55 : 0), radius: height * 3.2)
+            .animation(.easeOut(duration: 0.4), value: live)
     }
 }
 
@@ -261,6 +321,34 @@ struct CircleIconButton: View {
         }
         .buttonStyle(PressStyle(scale: 0.9))
         .accessibilityLabel(label)
+    }
+}
+
+// MARK: - Abzeichen „RGBIC“ / „RGB“
+
+/// Kleines Abzeichen: kann das Licht Lauflichter (RGBIC) oder nur eine Farbe (RGB)?
+struct PixelBadge: View {
+    let kind: PixelKind
+
+    var body: some View {
+        if let text = kind.badge {
+            let addressable = kind == .addressable
+            Text(text)
+                .font(.geist(10, 700))
+                .tracking(0.8)
+                .foregroundStyle(addressable ? Color(rgb: 0x14130E) : Theme.muted)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background {
+                    if addressable {
+                        Capsule().fill(LinearGradient(colors: [Color(rgb: 0xFF3B6B), Theme.accent, Color(rgb: 0x3BE0FF)],
+                                                      startPoint: .leading, endPoint: .trailing))
+                    } else {
+                        Capsule().strokeBorder(Theme.soft, lineWidth: 1)
+                    }
+                }
+                .accessibilityLabel(addressable ? "Einzeln steuerbare LEDs" : "Eine Farbe für die ganze Leiste")
+        }
     }
 }
 

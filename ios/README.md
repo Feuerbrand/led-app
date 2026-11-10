@@ -2,11 +2,14 @@
 
 Die Webseite aus diesem Repository als echte iPhone-App – ohne Bluefy, mit mehr Funktionen:
 
-- **Mehrere Lichter gleichzeitig:** die ELK-BLEDOM-Leiste und Lichter, die sonst nur **Lotus Lamp X** steuert (MELK-Geräte). Alle eingeschalteten Lichter zeigen dieselbe Farbe und dieselben Effekte.
-- **Licht:** An/Aus, Helligkeit, Farbe (Farbwähler, Farbton- und Weißton-Leiste, 12 Farbfelder) und **Szenen** zum Speichern und Antippen.
-- **Effekte:** die acht Flow-Effekte der Webseite, ein **Musik-Modus** (Lichter pulsieren im Takt), Tempo und die eingebauten Effekte jedes Lichts.
-- **Geräte:** eigene Lichter mit Status und Empfang, verbinden/trennen per Schalter, umbenennen, blinken lassen, neue Lichter in der Nähe hinzufügen.
-- **Siri und Kurzbefehle:** „Hey Siri, LED Control an“, Automationen, Aktionstaste.
+- **Hauptmenü wie bei Lotus Lamp X:** jedes Licht als Karte, die in seiner Farbe leuchtet, mit eigenem Ein/Aus-Knopf. Antippen öffnet die Steuerung nur für dieses Licht, **Alle Lichter** steuert alle zusammen.
+- **Mehrere Lichter:** die ELK-BLEDOM-Leiste und Lichter, die sonst nur **Lotus Lamp X** steuert (MELK-Geräte). Jedes Licht hat seine eigene Farbe, Helligkeit und seinen eigenen Effekt.
+- **Hinzufügen mit Namen:** **+** zeigt nur passende LED-Lichter in der Nähe; beim Hinzufügen vergibst du gleich einen eigenen Namen (z. B. „Wohnzimmer“).
+- **Farbe:** Farbrad zum Ziehen, Weißton-Leiste, 12 Farbfelder, Helligkeit.
+- **Effekte:** die acht Flow-Effekte der Webseite, **Musik-Modus** (Lichter pulsieren im Takt), Tempo, die eingebauten Effekte jedes Lichts und bei „Alle Lichter“ die **Welle**: die Farbe wandert von Licht zu Licht.
+- **Szenen** zum Speichern und Antippen.
+- **Siri und Kurzbefehle:** „Hey Siri, LED Control an“, „Schalte Wohnzimmer mit LED Control an“, Szenen per Name, Automationen, Aktionstaste – ohne Einrichtung.
+- **Erkennt, was ein Licht kann:** Leisten mit einzeln steuerbaren LEDs (**RGBIC**) bekommen Lauflichter, die die Leiste entlangfahren; normale **RGB**-Leisten zeigen immer eine Farbe.
 - **Updates:** Die App meldet neue Versionen; mit AltStore aktualisiert sie sich mit einem Tippen.
 
 Die App kommt nicht aus dem App Store. GitHub baut sie auf einem Mac in der Cloud, du installierst sie vom Windows-PC aus mit deiner eigenen Apple-ID.
@@ -109,7 +112,7 @@ Ab dann kommt jede Änderung an der App von selbst aufs iPhone. GitHub pausiert 
 
 Läuft TestFlight (Weg 3), kann dieselbe App in den App Store – ohne Zusatzkosten, solange sie kostenlos ist. Vorbereitet ist schon:
 
-- **Vorführmodus:** Apple hat keine Leiste zum Testen. Auf dem ersten Bildschirm gibt es deshalb **„Ohne Licht ausprobieren“**, unter **Geräte** den Schalter **Vorführmodus**.
+- **Vorführmodus:** Apple hat keine Leiste zum Testen. Im Hauptmenü gibt es deshalb **„Ohne Licht ausprobieren“**, in den **Einstellungen** den Schalter **Vorführmodus**.
 - **App-Store-Version:** Kommt die App aus dem App Store oder TestFlight, blendet sie alles zu AltStore, GitHub-Downloads und der eigenen Update-Prüfung aus und stellt keine Internetverbindung her.
 - **Bildschirmfotos:** Jeder Build nimmt im Simulator vier Bilder im größten iPhone-Format auf (Artifact **app-store-bilder** im Lauf auf GitHub).
 - **Texte:** [appstore/APPSTORE.md](appstore/APPSTORE.md) – Untertitel, Beschreibung, Schlüsselwörter, Hinweise für die Prüfer, Antworten zu Datenschutz und Altersfreigabe.
@@ -144,10 +147,12 @@ Dann die App öffnen und **Bluetooth erlauben**. Lotus Lamp X vorher ganz schlie
 ## Lichter hinzufügen
 
 - **ELK-Leiste:** wird beim allerersten Start automatisch gefunden und übernommen.
-- **Lichter aus Lotus Lamp X (MELK-…):** Reiter **Geräte** → unter **In der Nähe** beim Licht auf **Hinzufügen** tippen. Lotus Lamp X muss dafür geschlossen sein, denn ein Licht nimmt immer nur eine Verbindung an. MELK-Lichter werden nie von selbst verbunden.
-- **Licht mit anderem Namen:** unter **Geräte** „Alle Bluetooth-Geräte zeigen“ einschalten. Die App versucht es dann mit den Befehlen der ELK-Leiste; das klappt nicht bei jedem Gerät.
+- **Weitere Lichter** (auch aus Lotus Lamp X, MELK-…): im Hauptmenü oben auf **+** tippen. Die Liste zeigt nur passende LED-Lichter in der Nähe; eins antippen, Namen vergeben, **Hinzufügen**. Lotus Lamp X muss dafür geschlossen sein, denn ein Licht nimmt immer nur eine Verbindung an. MELK-Lichter werden nie von selbst verbunden.
+- **Licht mit anderem Namen:** in den **Einstellungen** (Regler-Symbol oben rechts) „Alle Bluetooth-Geräte zeigen“ einschalten. Die App versucht es dann mit den Befehlen der ELK-Leiste; das klappt nicht bei jedem Gerät.
+- **Karte gedrückt halten:** Blinken lassen (zum Erkennen), Umbenennen, Trennen/Verbinden, Entfernen. Dasselbe gibt es in der Steuerung oben rechts unter **⋯**.
+- **Lauflicht entlang einer Leiste** geht nur mit Leisten, deren LEDs einzeln steuerbar sind (meist 3 Kontakte: +, Daten, −). Normale RGB-Leisten wie die ELK-BLEDDM (4 Kontakte: +, R, G, B) leuchten immer ganz in einer Farbe. Die **Welle** bei „Alle Lichter“ lässt die Farbe stattdessen von Licht zu Licht wandern.
 - Der **Schalter** neben einem Licht verbindet bzw. trennt es. Nur verbundene Lichter werden mitgesteuert. Über **⋯** lässt sich ein Licht **blinken lassen** (zum Erkennen), **umbenennen** oder **entfernen**.
-- Die **eingebauten Effekte** unterscheiden sich je nach Gerät. Unter **Effekte → Eingebaut** steht deshalb für jede Gerätesorte eine eigene Liste; ein Effekt geht nur an die passenden Lichter.
+- Die **eingebauten Effekte** unterscheiden sich je nach Gerät. In der Steuerung unter **Effekte** steht deshalb für jede Gerätesorte eine eigene Liste; ein Effekt geht nur an die passenden Lichter.
 
 Die Befehle für die MELK-Lichter stammen aus dem Open-Source-Projekt [elkbledom](https://github.com/dave-code-ruiz/elkbledom) (MIT-Lizenz). Nach dem Verbinden meldet sich die App bei MELK-Lichtern an (zwei kurze Befehle, je 1 s Pause) – das dauert rund 2 Sekunden.
 
@@ -158,8 +163,11 @@ Die Befehle für die MELK-Lichter stammen aus dem Open-Source-Projekt [elkbledom
 ## Siri und Kurzbefehle
 
 - „**Hey Siri, LED Control an**“ / „**… aus**“ / „**… umschalten**“
-- In der **Kurzbefehle-App** gibt es außerdem „Szene starten“ (nach Name) und „Helligkeit setzen“ – gut für Automationen (z. B. Licht an bei Sonnenuntergang, wenn der Wecker klingelt) und für die Aktionstaste.
-- Links für die Aktion „URL öffnen“ (in der App unter **Mehr** zum Kopieren):
+- „**Schalte Wohnzimmer mit LED Control an**“ / „**… aus**“ – für jedes Licht mit seinem eigenen Namen
+- „**Starte Kino mit LED Control**“ – Szene per Name
+- In der **Kurzbefehle-App** stehen alle Aktionen fertig bereit (Licht an/aus, bestimmtes Licht, Szene starten, Helligkeit setzen) – gut für Automationen (z. B. Licht an bei Sonnenuntergang) und die Aktionstaste. In der App unter **Einstellungen** öffnet ein Knopf die Kurzbefehle-App direkt bei LED Control.
+- **Alexa** geht mit Bluetooth-Leisten nicht direkt (sie brauchen WLAN oder eine Brücke wie Home Assistant).
+- Links für die Aktion „URL öffnen“ (in der App unter **Einstellungen** zum Kopieren). Sie wirken immer auf alle Lichter:
   `ledcontrol://on`, `ledcontrol://off`, `ledcontrol://toggle`, `ledcontrol://color?hex=FF7A00`, `ledcontrol://brightness?value=40`, `ledcontrol://scene?name=Kino`, `ledcontrol://flow?id=rainbow`
 
 Die App öffnet sich dafür kurz, verbindet sich und führt den Befehl aus.
@@ -169,7 +177,7 @@ Die App öffnet sich dafür kurz, verbindet sich und führt den Befehl aus.
 - Jede Änderung im Ordner `ios/` auf dem Zweig `main` baut die App neu und veröffentlicht sie als **GitHub-Release** `ios-v1.1.<Nummer>` mit `LEDControl.ipa` und der AltStore-Quelle `altstore.json`. Auf anderen Zweigen wird nur gebaut, nicht veröffentlicht.
 - **AltStore** liest die Quelle und bietet das Update an.
 - **TestFlight** (Weg 3): Sind die Secrets eingerichtet, lädt jeder Build die App zusätzlich zu Apple hoch – auch von anderen Zweigen, damit du Änderungen vor dem Übernehmen testen kannst. TestFlight aktualisiert die App dann von selbst; die App zeigt in diesem Fall keinen eigenen Update-Hinweis.
-- **Die App** sieht beim Öffnen nach (höchstens alle 30 Minuten, abschaltbar unter **Mehr**) und zeigt „Update verfügbar“. Selbst austauschen kann sich eine App unter iOS nicht – das übernimmt AltStore oder Sideloadly.
+- **Die App** sieht beim Öffnen nach (höchstens alle 30 Minuten, abschaltbar in den **Einstellungen**) und zeigt „Update verfügbar“. Selbst austauschen kann sich eine App unter iOS nicht – das übernimmt AltStore oder Sideloadly.
 
 ## Alle 7 Tage erneuern (kostenlose Apple-ID)
 
@@ -199,15 +207,17 @@ Diese Punkte konnten ohne iPhone und Lichter nicht ausprobiert werden:
 - [ ] **Flow-Effekte:** alle acht laufen flüssig, Wechsel ohne Sprung, **Tempo** wirkt, nochmal Antippen hält an.
 - [ ] **Musik-Modus:** fragt nach dem Mikrofon, die Leiste pulsiert mit der Musik.
 - [ ] **Szenen:** antippen, speichern, lange drücken zum Löschen.
-- [ ] **MELK-Licht** (Lotus Lamp X vorher schließen): unter **Geräte** hinzufügen, es verbindet sich (nach rund 2 s), An/Aus, Helligkeit, Farbe und seine eigenen eingebauten Effekte wirken. Beide Lichter folgen gemeinsam.
-- [ ] **Geräte:** Schalter trennt/verbindet, **Blinken lassen** blinkt das richtige Licht, Umbenennen, Entfernen, Empfangsbalken.
+- [ ] **MELK-Licht** (Lotus Lamp X vorher schließen): über **+** hinzufügen und benennen, es verbindet sich (nach rund 2 s), An/Aus, Helligkeit, Farbe und seine eigenen eingebauten Effekte wirken.
+- [ ] **Einzeln und gemeinsam:** Karte antippen steuert nur dieses Licht, **Alle Lichter** steuert beide; die **Welle** lässt einen Effekt von Licht zu Licht wandern.
+- [ ] **Karten:** leuchten in der Farbe des Lichts, Ein/Aus-Knopf, gedrückt halten → Blinken lassen, Umbenennen, Entfernen.
 - [ ] **Neu verbinden:** Licht kurz vom Strom nehmen, außer Reichweite gehen, Bluetooth aus und an, App in den Hintergrund und zurück – jedes Mal verbindet sie von allein wieder.
-- [ ] **Siri:** „Hey Siri, LED Control an“ und „… aus“; ein Link wie `ledcontrol://color?hex=FF7A00` aus Safari oder Kurzbefehle.
+- [ ] **Siri:** „Hey Siri, LED Control an“ und „… aus“, „Schalte Wohnzimmer mit LED Control an“, „Starte Kino mit LED Control“; Knopf „Kurzbefehle“ in den Einstellungen.
+- [ ] **Abzeichen:** Die ELK-Leiste zeigt „RGB“; ein Licht mit einzeln steuerbaren LEDs zeigt „RGBIC“ und unter Effekte das Feld **Lauflicht**.
 - [ ] **Updates** (erst nach der ersten Veröffentlichung auf `main`): AltStore-Quelle hinzufügen, App erscheint dort; nach einer neuen Version zeigt die App „Update verfügbar“.
 - [ ] Der Bildschirm bleibt an, solange ein Flow läuft, und geht danach wieder normal aus.
 - [ ] Aussehen: Geist-Schrift, die Lampe oben leuchtet in der Farbe der Lichter, Regler und Leisten lassen sich gut ziehen.
 
-Wenn etwas hakt, hilft das **Protokoll** unter **Mehr**: den Text lange gedrückt halten, kopieren und mitschicken.
+Wenn etwas hakt, hilft das **Protokoll** in den **Einstellungen**: den Text lange gedrückt halten, kopieren und mitschicken.
 
 ## Gut zu wissen
 
@@ -224,7 +234,8 @@ Wenn etwas hakt, hilft das **Protokoll** unter **Mehr**: den Text lange gedrück
 | `LEDControl/LightController.swift` | Zustand und Lichtlogik (An/Aus, Farbe, Flows, Musik, Szenen, Kurzbefehle) |
 | `LEDControl/ColorMath.swift`, `Flows.swift`, `SendQueue.swift` | Farbrechnung, Flow-Effekte und Sende-Regel, aus `index.html` übernommen |
 | `LEDControl/SoundMeter.swift`, `Scenes.swift`, `Updater.swift`, `Intents.swift` | Musik-Pegel, Szenen und Speichern, Update-Prüfung, Siri/Kurzbefehle |
-| `LEDControl/ContentView.swift`, `LightTab.swift`, `EffectsTab.swift`, `DevicesTab.swift`, `MoreTab.swift` | die vier Reiter |
+| `LEDControl/ContentView.swift`, `HomeView.swift`, `AddLightSheet.swift`, `ControlView.swift`, `SettingsView.swift` | Hauptmenü, Hinzufügen, Steuerung, Einstellungen |
+| `LEDControl/ColorWheel.swift`, `Components.swift` | Farbrad und gemeinsame Bausteine der Oberfläche |
 | `LEDControl/Backdrop.swift`, `Controls.swift`, `Icons.swift`, `Theme.swift` | Hintergrund, Lampe, Bedienelemente, Symbole, Farben und Schrift |
 | `LEDControl/Fonts/` | Geist und Geist Mono als `.ttf`, umgewandelt aus den `.woff2`-Dateien in `fonts/` (Lizenz: `OFL.txt`) |
 | `Tests/` | Selbsttest: `make-expected.mjs` berechnet Soll-Werte mit dem echten Code aus `index.html`, `main.swift` vergleicht die App-Logik damit und prüft die MELK-Bytes. Läuft bei jedem Build. |

@@ -55,6 +55,15 @@ struct ControlView: View {
         return "\(lights.filter { $0.state == .on }.count) von \(lights.count) Lichtern verbunden"
     }
 
+    /// Farben für die Leiste unter dem Namen: bei „Alle Lichter“ die Farben aller Lichter nebeneinander
+    private var stripColors: [Color] {
+        let lights = light.lightsOf(target)
+        if target == .all && lights.count > 1 {
+            return lights.map { light.glow(.light($0.id)).color }
+        }
+        return [light.glow(target).color]
+    }
+
     var body: some View {
         let usable = light.demo || light.isConnected(target)
         Page {
@@ -63,7 +72,10 @@ struct ControlView: View {
             Text(subtitle)
                 .font(.geist(13, 400))
                 .foregroundStyle(Theme.muted)
-                .padding(.bottom, 18)
+            LightStrip(colors: stripColors, live: light.isLive(target), height: 6)
+                .frame(maxWidth: 220)
+                .padding(.top, 14)
+                .padding(.bottom, 22)
 
             Group {
                 PowerButtons().rise(0)
@@ -251,6 +263,7 @@ private struct ColorSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 TileHeader(icon: .drop, title: "Farbe", value: light.base.hex)
                 ColorWheel(color: light.base) { light.pick($0, instant: true) }
+                    .shadow(color: light.base.color.opacity(0.45), radius: 30)
                     .frame(maxWidth: 300)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
@@ -330,7 +343,13 @@ private struct EffectsSection: View {
 
     var body: some View {
         let lights = light.lightsOf(target)
+        let connected = lights.filter { $0.state == .on }
+        let addressable = connected.contains { $0.model.pixels == .addressable }
+        let singleOnly = !connected.isEmpty && connected.allSatisfy { $0.model.pixels == .singleColor }
         VStack(spacing: 12) {
+            if addressable {
+                RunningLightTile()
+            }
             if target == .all && (lights.count > 1 || light.demo) {
                 WaveTile()
             }
@@ -349,8 +368,101 @@ private struct EffectsSection: View {
                 .padding(.top, 6)
             BuiltinTiles(target: target)
                 .padding(.top, 6)
+            if singleOnly {
+                SingleColorNote(multiple: target == .all && lights.count > 1)
+                    .padding(.top, 6)
+            }
         }
         .sensoryFeedback(.selection, trigger: light.flowID)
+    }
+}
+
+/// Nur bei Leisten mit einzeln steuerbaren LEDs: Lauflichter, die die Leiste entlangfahren
+private struct RunningLightTile: View {
+    @Environment(LightController.self) private var light
+
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Icon(kind: .flash, size: 17, color: Theme.accent)
+                Text("Lauflicht")
+                    .font(.geist(16, 600))
+                    .foregroundStyle(Theme.text)
+                PixelBadge(kind: .addressable)
+                Spacer(minLength: 0)
+            }
+            Clock { t in
+                GeometryReader { geo in
+                    let w = Double(geo.size.width)
+                    let p = (t * 0.5).truncatingRemainder(dividingBy: 1)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.08))
+                        Capsule()
+                            .fill(LinearGradient(colors: [Color(rgb: 0xFF3B6B).opacity(0), Color(rgb: 0xFF3B6B), Theme.accent],
+                                                 startPoint: .leading, endPoint: .trailing))
+                            .frame(width: CGFloat(w * 0.3))
+                            .offset(x: CGFloat(-w * 0.3 + p * w * 1.3))
+                            .shadow(color: Theme.accent.opacity(0.8), radius: 6)
+                    }
+                    .clipShape(Capsule())
+                }
+            }
+            .frame(height: 8)
+            Text("Diese Leiste hat einzeln steuerbare LEDs – die Effekte fahren die Leiste entlang. Das Tempo stellst du unten ein.")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(2)
+            LazyVGrid(columns: Self.columns, spacing: 10) {
+                ForEach(EffectFamily.stripX.effects) { effect in
+                    Button(effect.name) {
+                        light.startBuiltin(effect.code, family: .stripX)
+                    }
+                    .buttonStyle(OutlineButtonStyle(on: light.builtin == effect.code && light.builtinFamily == .stripX))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.tile, in: RoundedRectangle(cornerRadius: 8))
+        .overlay { ScanBorder(radius: 8, color: Theme.accent, period: 3, width: 1.5) }
+    }
+}
+
+/// Bei normalen RGB-Leisten: kurz erklären, warum es dort kein Lauflicht gibt
+private struct SingleColorNote: View {
+    let multiple: Bool
+
+    @State private var open = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeOut(duration: 0.25)) { open.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    PixelBadge(kind: .singleColor)
+                    Text("Lauflicht entlang der Leiste?")
+                        .font(.geist(14, 500))
+                        .foregroundStyle(Theme.text)
+                    Spacer(minLength: 0)
+                    Icon(kind: .chevron, size: 15, color: Theme.muted)
+                        .rotationEffect(.degrees(open ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if open {
+                Text("Diese Leiste ist eine normale RGB-Leiste (Stecker mit 4 Kontakten: +, R, G, B). Alle LEDs bekommen dasselbe Signal und zeigen immer dieselbe Farbe – auch zwei Leisten am selben Verteiler. Für ein Lauflicht entlang der Leiste braucht es eine RGBIC-Leiste (3 Kontakte: +, Daten, −)."
+                     + (multiple ? " Mit mehreren Lichtern geht stattdessen die Welle: Die Farbe wandert von Licht zu Licht." : ""))
+                    .font(.geist(12, 400))
+                    .foregroundStyle(Theme.muted)
+                    .lineSpacing(2)
+                    .transition(.opacity)
+            }
+        }
+        .tile()
     }
 }
 
@@ -498,14 +610,14 @@ private struct BuiltinTiles: View {
 
     var body: some View {
         let lights = light.lightsOf(target).filter { $0.state == .on }
-        let families = EffectFamily.allCases.filter { family in lights.contains { $0.model.family == family } }
+        let families = EffectFamily.allCases.filter { family in family != .stripX && lights.contains { $0.model.family == family } }
         VStack(spacing: 12) {
-            ForEach(families.isEmpty ? [EffectFamily.elk] : families, id: \.self) { family in
-                BuiltinTile(family: family)
+            if !families.isEmpty || lights.isEmpty {
+                ForEach(families.isEmpty ? [EffectFamily.elk] : families, id: \.self) { family in
+                    BuiltinTile(family: family)
+                }
             }
-            Hint(text: families.contains(.stripX)
-                 ? "Diese Effekte laufen im Licht selbst – auch wenn die App zu ist. Bei Leisten mit einzeln steuerbaren LEDs fahren die Lauflichter die Leiste entlang."
-                 : "Diese Effekte laufen im Licht selbst weiter, auch wenn die App zu ist.")
+            Hint(text: "Eingebaute Effekte laufen im Licht selbst weiter, auch wenn die App zu ist.")
         }
     }
 }

@@ -150,6 +150,13 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         showAll = on
     }
 
+    /// Gespeicherte eigene Lichter (Kennung und angezeigter Name), ohne Bluetooth zu starten – für Siri und Kurzbefehle
+    static func storedLights() -> [(id: UUID, title: String)] {
+        guard let data = UserDefaults.standard.data(forKey: storeKey),
+              let list = try? JSONDecoder().decode([Stored].self, from: data) else { return [] }
+        return list.map { (id: $0.id, title: $0.alias.isEmpty ? $0.name : $0.alias) }
+    }
+
     func light(id: UUID) -> Light? {
         lights.first { $0.id == id }
     }
@@ -281,10 +288,10 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// Sie werden nicht gespeichert.
     func showSampleLights() {
         guard lights.isEmpty else { return }
-        let melk = LightModel.find(prefix: "MELK-OA10") ?? LightModel.elk
+        let melk = LightModel.find(prefix: "MELK-OA21") ?? LightModel.elk
         let samples: [(name: String, alias: String, model: LightModel, on: Bool, rssi: Int)] = [
             ("ELK-BLEDDM", "Leiste Wohnzimmer", LightModel.elk, true, -54),
-            ("MELK-OA10", "Lampe Schlafzimmer", melk, true, -66),
+            ("MELK-OA21", "Leiste Schlafzimmer", melk, true, -66),
             ("ELK-BLEDOM", "", LightModel.elk, false, -81),
         ]
         for s in samples {

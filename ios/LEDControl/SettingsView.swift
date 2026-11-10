@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import UIKit
 
@@ -229,6 +230,13 @@ private struct AppStoreTile: View {
 
 private struct ShortcutsTile: View {
     @State private var copied: String? = nil
+    @State private var showTip = true
+
+    private static let phrases = [
+        "„LED Control an“ / „LED Control aus“",
+        "„Schalte Wohnzimmer mit LED Control an“",
+        "„Starte Kino mit LED Control“",
+    ]
 
     private static let links: [(String, String)] = [
         ("ledcontrol://on", "Licht an"),
@@ -248,10 +256,27 @@ private struct ShortcutsTile: View {
                     .font(.geist(15, 600))
                     .foregroundStyle(Theme.text)
             }
-            Text("Funktioniert auch mit „… aus“ und „… umschalten“. In der Kurzbefehle-App gibt es außerdem „Szene starten“ und „Helligkeit setzen“ – gut für Automationen (z. B. Licht an bei Sonnenuntergang) und die Aktionstaste.")
+            Text("Die Befehle funktionieren sofort, ohne Einrichtung – auch für einzelne Lichter und Szenen:")
                 .font(.geist(12, 400))
                 .foregroundStyle(Theme.muted)
                 .lineSpacing(2)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Self.phrases, id: \.self) { phrase in
+                    HStack(spacing: 8) {
+                        Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                        Text(phrase)
+                            .font(.geist(13, 500))
+                            .foregroundStyle(Theme.text)
+                    }
+                }
+            }
+            SiriTipView(intent: LightOnIntent(), isVisible: $showTip)
+            Text("In der Kurzbefehle-App findest du alle Aktionen fertig zum Antippen – für Automationen (z. B. Licht an bei Sonnenuntergang) und die Aktionstaste:")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(2)
+            ShortcutsLink()
+                .frame(maxWidth: .infinity)
             Text("Links für „URL öffnen“ – antippen zum Kopieren:")
                 .font(.geist(12, 500))
                 .foregroundStyle(Theme.text.opacity(0.8))

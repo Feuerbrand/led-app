@@ -666,29 +666,31 @@ final class LightController {
     }
 
     private func job(for action: String, _ values: [String: String]) -> (() -> Void)? {
+        // Optional ein einzelnes Licht: ledcontrol://on?light=<Kennung>; sonst alle Lichter
+        let t: Target = UUID(uuidString: values["light"] ?? "").map { Target.light($0) } ?? .all
         switch action {
         case "on", "an":
-            return { [weak self] in self?.applyPower(true, .all) }
+            return { [weak self] in self?.applyPower(true, t) }
         case "off", "aus":
-            return { [weak self] in self?.applyPower(false, .all) }
+            return { [weak self] in self?.applyPower(false, t) }
         case "toggle":
             return { [weak self] in
                 guard let self else { return }
-                self.applyPower(self.allLook.power != true, .all)
+                self.applyPower(self.lookOf(t).power != true, t)
             }
         case "color", "farbe":
             guard let c = RGB(hexString: values["hex"] ?? "") else { return nil }
-            return { [weak self] in self?.applyColor(c, .all, instant: false) }
+            return { [weak self] in self?.applyColor(c, t, instant: false) }
         case "brightness", "helligkeit":
             guard let v = Int(values["value"] ?? "") else { return nil }
-            return { [weak self] in self?.applyBrightness(min(max(v, 0), 100), .all) }
+            return { [weak self] in self?.applyBrightness(min(max(v, 0), 100), t) }
         case "scene", "szene":
             let name = (values["name"] ?? "").lowercased()
-            guard let scene = scenes.first(where: { $0.name.lowercased() == name }) else { return nil }
-            return { [weak self] in self?.applyScene(scene, .all) }
+            guard let scene = scenes.first(where: { $0.name.lowercased() == name || $0.id.uuidString.lowercased() == name }) else { return nil }
+            return { [weak self] in self?.applyScene(scene, t) }
         case "flow", "effekt":
             guard let f = Flow.all.first(where: { $0.id == values["id"] }) else { return nil }
-            return { [weak self] in self?.applyFlow(f, .all, toggle: false) }
+            return { [weak self] in self?.applyFlow(f, t, toggle: false) }
         default:
             return nil
         }

@@ -21,6 +21,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var nav = Navigator()
 
+    /// Namen aller Lichter und Szenen (ändert sich einer, bekommt Siri die neue Liste)
+    private var shortcutNames: [String] {
+        light.hub.mine.map { $0.title } + light.scenes.map { $0.name }
+    }
+
     var body: some View {
         NavigationStack(path: $nav.path) {
             HomeView()
@@ -44,6 +49,10 @@ struct ContentView: View {
         }
         .onChange(of: light.keepAwake, initial: true) { _, awake in
             UIApplication.shared.isIdleTimerDisabled = awake
+        }
+        .onChange(of: shortcutNames, initial: true) { _, _ in
+            // Siri kennt dann die aktuellen Namen der Lichter und Szenen
+            LEDShortcuts.updateAppShortcutParameters()
         }
         .onAppear {
             light.start()

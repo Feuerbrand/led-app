@@ -2,18 +2,22 @@
 
 ## Welche Lichter funktionieren?
 
-LED-Leisten und -Lampen mit Bluetooth, die sich als **ELK-BLEDOM** (bzw. ELK-BLEDDM) oder **MELK** melden. Solche Steuerungen stecken in vielen günstigen LED-Strips. Wie dein Licht heißt, siehst du in der App unter **Geräte → In der Nähe**.
+LED-Leisten und -Lampen mit Bluetooth, die sich als **ELK-BLEDOM** (bzw. ELK-BLEDDM) oder **MELK** melden. Solche Steuerungen stecken in vielen günstigen LED-Strips. Wie dein Licht heißt, siehst du beim Hinzufügen (**+** im Hauptmenü).
 
 ## Die App findet mein Licht nicht
 
 - Licht einschalten und in die Nähe gehen.
 - **Andere Licht-Apps vollständig schließen** (auch im App-Umschalter wegwischen). Ein Licht nimmt immer nur eine Verbindung an.
 - Bluetooth am iPhone einschalten und der App erlauben: *Einstellungen → Apps → LED Control → Bluetooth*.
-- Hat dein Licht einen anderen Namen: unter **Geräte** „Alle Bluetooth-Geräte zeigen“ einschalten und es dort hinzufügen.
+- Hat dein Licht einen anderen Namen: in den **Einstellungen** „Alle Bluetooth-Geräte zeigen“ einschalten und es über **+** hinzufügen.
 
 ## Mehrere Lichter
 
-Unter **Geräte** jedes Licht mit **Hinzufügen** aufnehmen. Alle eingeschalteten Lichter zeigen dieselbe Farbe und dieselben Effekte. Über **⋯** lässt sich ein Licht blinken lassen, umbenennen oder entfernen.
+Im Hauptmenü über **+** jedes Licht hinzufügen und benennen. Eine Karte antippen steuert nur dieses Licht, **Alle Lichter** steuert alle zusammen – auf Wunsch mit **Welle**, bei der ein Effekt von Licht zu Licht wandert. Karte gedrückt halten: blinken lassen, umbenennen, entfernen.
+
+## Lauflicht entlang der Leiste
+
+Das geht nur mit Leisten, deren LEDs einzeln steuerbar sind (meist 3 Kontakte: +, Daten, −); deren eingebaute Lauflichter findest du unter **Effekte**. Normale RGB-Leisten (4 Kontakte: +, R, G, B) leuchten technisch immer ganz in einer Farbe.
 
 ## Effekte stoppen, wenn das iPhone gesperrt ist
 
@@ -25,7 +29,7 @@ Die fließenden Effekte und der Musik-Modus werden von der App berechnet und lau
 
 ## Ohne Licht ausprobieren
 
-Auf dem ersten Bildschirm **Ohne Licht ausprobieren** antippen oder unter **Geräte** den **Vorführmodus** einschalten.
+Im Hauptmenü **Ohne Licht ausprobieren** antippen oder in den **Einstellungen** den **Vorführmodus** einschalten.
 
 ## Kontakt
 
