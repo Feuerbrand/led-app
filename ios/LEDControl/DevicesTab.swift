@@ -42,7 +42,7 @@ struct DevicesTab: View {
             ShowAllTile().rise(6)
             DemoTile()
 
-            Hint(text: "Lotus Lamp X und andere Licht-Apps vorher ganz schließen – ein Licht nimmt immer nur eine Verbindung an.")
+            Hint(text: "Andere Licht-Apps (z. B. die App des Herstellers) vorher ganz schließen – ein Licht nimmt immer nur eine Verbindung an.")
                 .padding(.top, 12)
                 .rise(7)
         }

@@ -94,7 +94,7 @@ final class LightController {
         scenes = Store.load([LightScene].self, key: Self.scenesKey) ?? LightScene.starters
         hub.onLog = { [weak self] message in self?.note(message) }
         hub.onReady = { [weak self] light in self?.sync(light) }
-        note("Bereit. Lotus Lamp X vorher schließen!")
+        note("Bereit. Andere Licht-Apps vorher schließen!")
     }
 
     // MARK: - Verbindung
@@ -127,6 +127,7 @@ final class LightController {
         let args = UserDefaults.standard
         guard !screenshotDone, args.bool(forKey: "demo") else { return }
         screenshotDone = true
+        hub.showSampleLights()
         setDemo(true)
         if let hex = args.string(forKey: "screenshotColor"), let c = RGB(hexString: hex) {
             pick(c, instant: true)

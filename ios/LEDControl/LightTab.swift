@@ -8,7 +8,7 @@ struct LightTab: View {
         let connected = light.canControl
         TabPage {
             HeroView()
-            Text("Eigene App für ELK-BLEDOM- und MELK-Lichter")
+            Text("Für ELK-BLEDOM- und MELK-Lichter")
                 .font(.geist(13, 400))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -303,8 +303,10 @@ private struct SceneRow: View {
                 .buttonStyle(PressStyle())
             }
             .padding(.vertical, 2)
+            .padding(.horizontal, 16)
         }
         .scrollIndicators(.hidden)
+        .padding(.horizontal, -16)
         .sensoryFeedback(.selection, trigger: light.sceneID)
         .alert("Szene speichern", isPresented: $naming) {
             TextField("Name", text: $name)

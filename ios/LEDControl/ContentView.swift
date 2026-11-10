@@ -142,7 +142,7 @@ private struct TabBar: View {
         .padding(.bottom, 2)
         .background {
             Rectangle()
-                .fill(Color(rgb: 0x0B0A07, opacity: 0.94))
+                .fill(Color(rgb: 0x0B0A07))
                 .overlay(alignment: .top) {
                     Rectangle().fill(Theme.soft).frame(height: 1)
                 }

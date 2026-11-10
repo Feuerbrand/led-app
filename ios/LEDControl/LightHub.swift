@@ -233,6 +233,10 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// Schickt die Warteschlange eines Lichts, mit 28 ms Pause zwischen zwei Paketen (rund 25 pro Sekunde).
     private func pump(_ light: Light) {
         if light.pumping { return }
+        guard light.peripheral != nil else {
+            light.queue.clear()                 // Beispiel-Licht ohne echte Verbindung
+            return
+        }
         light.pumping = true
         Task { @MainActor [self] in
             var stalled = 0
@@ -261,6 +265,25 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         guard let p = light.peripheral, let c = light.writeChar else { return }
         let type: CBCharacteristicWriteType = c.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
         p.writeValue(Data(bytes), for: c, type: type)
+    }
+
+    /// Nur für die automatischen App-Store-Bilder: Beispiel-Lichter ohne echte Verbindung.
+    /// Sie werden nicht gespeichert.
+    func showSampleLights() {
+        guard lights.isEmpty else { return }
+        let melk = LightModel.find(prefix: "MELK-OA10") ?? LightModel.elk
+        let samples: [(name: String, alias: String, model: LightModel, on: Bool, rssi: Int)] = [
+            ("ELK-BLEDDM", "Leiste Wohnzimmer", LightModel.elk, true, -54),
+            ("MELK-OA10", "Lampe Schlafzimmer", melk, true, -66),
+            ("ELK-BLEDOM", "", LightModel.elk, false, -81),
+        ]
+        for s in samples {
+            let light = Light(id: UUID(), name: s.name, alias: s.alias, model: s.model, saved: s.on, enabled: s.on)
+            light.state = s.on ? .on : .off
+            light.rssi = s.rssi
+            lights.append(light)
+        }
+        bluetooth = .ready
     }
 
     // MARK: - Speichern
