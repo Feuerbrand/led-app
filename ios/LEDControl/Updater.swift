@@ -37,13 +37,17 @@ final class Updater {
 
     let version: String
     let build: Int
+    /// Über TestFlight installiert: Updates kommen dann von Apple, nicht über GitHub
+    let viaTestFlight: Bool
+
+    static let openTestFlight = URL(string: "itms-beta://")!
 
     @ObservationIgnored private var lastCheck: Date? = nil
     private static let autoKey = "led-app.updates.auto"
 
     /// Neuere Version als die installierte, sonst nil
     var available: Release? {
-        guard let latest, latest.build > build else { return nil }
+        guard !viaTestFlight, let latest, latest.build > build else { return nil }
         return latest
     }
 
@@ -53,6 +57,10 @@ final class Updater {
         build = Int(info["CFBundleVersion"] as? String ?? "") ?? 0
         let defaults = UserDefaults.standard
         automatic = defaults.object(forKey: Self.autoKey) as? Bool ?? true
+        // TestFlight-Apps haben eine Test-Quittung, aber (anders als selbst signierte) kein eingebettetes Profil
+        let sandbox = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        let profile = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil
+        viaTestFlight = sandbox && !profile
     }
 
     func setAutomatic(_ on: Bool) {
@@ -63,7 +71,7 @@ final class Updater {
 
     /// Nachsehen; ohne `force` höchstens alle 30 Minuten und nur, wenn automatisch eingeschaltet
     func check(force: Bool = false) {
-        if status == .checking { return }
+        if viaTestFlight || status == .checking { return }
         if !force {
             guard automatic else { return }
             if let lastCheck, Date().timeIntervalSince(lastCheck) < 30 * 60 { return }

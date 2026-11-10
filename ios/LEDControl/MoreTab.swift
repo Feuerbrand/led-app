@@ -3,11 +3,17 @@ import UIKit
 
 /// Reiter „Mehr“: Updates, Siri und Kurzbefehle, Protokoll, Info
 struct MoreTab: View {
+    @Environment(Updater.self) private var updater
+
     var body: some View {
         TabPage {
             PageTitle(title: "Mehr", subtitle: "Updates, Kurzbefehle und Protokoll")
             SectionTitle("Updates").rise(1)
-            UpdatesTile().rise(2)
+            if updater.viaTestFlight {
+                TestFlightTile().rise(2)
+            } else {
+                UpdatesTile().rise(2)
+            }
             SectionTitle("Siri & Kurzbefehle").rise(3)
             ShortcutsTile().rise(4)
             SectionTitle("Protokoll").rise(5)
@@ -110,6 +116,39 @@ private struct UpdatesTile: View {
                     .foregroundStyle(Theme.text)
             }
             .tint(Theme.accent)
+        }
+        .tile()
+    }
+}
+
+/// Über TestFlight installiert: Updates kommen von Apple, die App muss nichts selbst prüfen
+private struct TestFlightTile: View {
+    @Environment(Updater.self) private var updater
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Icon(kind: .check, size: 17, color: Theme.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Version \(updater.version) über TestFlight")
+                        .font(.geist(16, 600))
+                        .foregroundStyle(Theme.text)
+                    Text("Neue Versionen kommen automatisch.")
+                        .font(.geist(12, 400))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            Text("In der TestFlight-App bei LED Control „Automatische Updates“ einschalten. Jede Version läuft 90 Tage; GitHub baut jeden Monat automatisch eine neue.")
+                .font(.geist(12, 400))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(2)
+            Button {
+                openURL(Updater.openTestFlight)
+            } label: {
+                Text("TestFlight öffnen")
+            }
+            .buttonStyle(OutlineButtonStyle(on: true))
         }
         .tile()
     }

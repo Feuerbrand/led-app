@@ -13,6 +13,9 @@ on:
     paths:
       - 'ios/**'
       - '.github/workflows/ios.yml'
+  schedule:
+    # Monatlich neu bauen: TestFlight-Versionen laufen nach 90 Tagen ab
+    - cron: '17 5 1 * *'
 
 permissions:
   contents: read
@@ -79,6 +82,8 @@ jobs:
             echo "$key: $(/usr/libexec/PlistBuddy -c "Print :$key" "$APP/Info.plist" | tr '\n' ' ')"
           done
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")" = "$VERSION"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist")" = "false"
+          test -f "$APP/PrivacyInfo.xcprivacy"
           test -f "$APP/Geist.ttf"
           test -f "$APP/GeistMono.ttf"
           ls "$APP" | grep -i -E "Metadata.appintents|\.car$" || true
@@ -158,7 +163,8 @@ jobs:
   release:
     name: Veröffentlichen
     needs: prepare
-    if: github.ref == 'refs/heads/main'
+    # Der monatliche Lauf ist nur für TestFlight da, kein neues Release
+    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -176,3 +182,134 @@ jobs:
         working-directory: release
         run: |
           gh release create "ios-v$VERSION" LEDControl.ipa altstore.json icon.png             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA"             --title "LED Control $VERSION" --notes-file notes.md --latest
+
+  # TestFlight: nur wenn die vier Secrets angelegt sind (Anleitung in ios/README.md, „Weg 3“).
+  # Secrets lassen sich in Bedingungen nicht direkt abfragen, deshalb dieser kleine Vorab-Schritt.
+  testflight-check:
+    name: TestFlight eingerichtet?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -z "$missing" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "TestFlight ist eingerichtet."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "TestFlight noch nicht eingerichtet, es fehlen:$missing"
+          fi
+
+  # Signiert die App mit dem Apple-Entwickler-Account (Cloud-Signierung über den API-Schlüssel)
+  # und lädt sie zu TestFlight hoch. Von dort installiert und aktualisiert die TestFlight-App sie.
+  testflight:
+    name: TestFlight
+    needs: [build, testflight-check]
+    if: needs.testflight-check.outputs.ready == 'true'
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Xcode-Projekt erzeugen
+        working-directory: ios
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen generate
+
+      - name: API-Schlüssel ablegen
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          KEY="$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          mkdir -p "$(dirname "$KEY")"
+          # Akzeptiert den Inhalt der .p8-Datei direkt oder base64-kodiert
+          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          else
+            printf '%s' "$ASC_KEY_P8" | base64 --decode > "$KEY"
+          fi
+          grep -q "BEGIN PRIVATE KEY" "$KEY" || { echo "::error::ASC_KEY_P8 ist kein gültiger API-Schlüssel (.p8)"; exit 1; }
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          sed -i '' 's/^          //' "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+
+      # Erst ohne Signatur bauen und nur beim Export signieren lassen: so legt Xcode nicht bei jedem
+      # Lauf ein neues Entwickler-Zertifikat an.
+      - name: Archiv bauen (ohne Signatur)
+        working-directory: ios
+        run: |
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
+            -quiet archive
+
+      - name: Signieren und zu TestFlight hochladen
+        id: upload
+        continue-on-error: true
+        run: |
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      # Falls Apple das nachträgliche Signieren ablehnt: signiert bauen (legt dann ein Entwickler-Zertifikat an)
+      - name: Zweiter Versuch mit signiertem Archiv
+        if: steps.upload.outcome == 'failure'
+        working-directory: ios
+        run: |
+          rm -rf "$RUNNER_TEMP/LEDControl.xcarchive" "$RUNNER_TEMP/export"
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
+            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -quiet archive
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/LEDControl.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Hinweis
+        run: |
+          echo "Version $VERSION (Build $BUILD) ist bei Apple hochgeladen."
+          echo "Apple verarbeitet sie noch etwa 10–30 Minuten, dann erscheint sie in der TestFlight-App."
+
+      - name: API-Schlüssel löschen
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

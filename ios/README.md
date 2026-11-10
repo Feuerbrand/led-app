@@ -50,6 +50,60 @@ AltStore zählt selbst als eine der drei Apps, die eine kostenlose Apple-ID glei
 
 **Updates mit Sideloadly:** die neue `.ipa` herunterladen und genauso noch einmal installieren. Einstellungen, Lichter und Szenen bleiben erhalten.
 
+## Weg 3: Apple-Entwickler-Account und TestFlight – ohne PC und Kabel
+
+Mit dem bezahlten [Apple Developer Program](https://developer.apple.com/programs/) (99 €/Jahr) lädt GitHub jede neue Version direkt zu Apple hoch. Auf dem iPhone installierst du sie mit Apples App **TestFlight** aus dem App Store – ohne Kabel, ohne Entwicklermodus, ohne „Vertrauen“. TestFlight aktualisiert die App von selbst. Jede Version läuft 90 Tage; GitHub baut deshalb jeden Monat automatisch eine neue.
+
+Die folgenden Schritte machst du selbst – Anmeldung, Bezahlung und Schlüssel gehören zu deinem Konto. Alles geht im Browser am PC oder am iPhone.
+
+**1. Beim Apple Developer Program anmelden**
+- Am einfachsten mit der App **Apple Developer** aus dem App Store: *Konto* → mit deiner Apple-ID anmelden → **Jetzt registrieren** → als **Einzelperson** → 99 € bezahlen.
+- Oder im Browser: [developer.apple.com/programs/enroll](https://developer.apple.com/programs/enroll/).
+- Die Freischaltung kann bis zu zwei Tage dauern; Apple schickt eine E-Mail.
+
+**2. App-Kennung anlegen**
+- [developer.apple.com/account](https://developer.apple.com/account) → **Certificates, IDs & Profiles** → **Identifiers** → **+** → **App IDs** → **App** → Weiter.
+- *Description:* `LED Control`, *Bundle ID:* **Explicit** → `de.feuerbrand.ledcontrol`. Keine Häkchen bei den Funktionen nötig → **Register**.
+- Meldet Apple, dass die Kennung vergeben ist, schreib mir – dann ändere ich sie in der App.
+
+**3. App in App Store Connect anlegen**
+- [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **Apps** → **+** → **Neue App**.
+- Plattform **iOS**, *Name* muss im ganzen App Store einmalig sein, z. B. `LED Control Feuerbrand` (auf dem Home-Bildschirm steht trotzdem „LED Control“), Sprache **Deutsch**, *Bundle-ID* die aus Schritt 2, *SKU* `ledcontrol`, Zugriff **Voller Zugriff** → **Erstellen**.
+- Die App wird damit **nicht** im App Store veröffentlicht; sie bleibt privat für TestFlight.
+
+**4. API-Schlüssel für GitHub erstellen**
+- App Store Connect → **Benutzer und Zugriff** → **Integrationen** → **App Store Connect API** → **Team-Schlüssel** (beim ersten Mal „Zugriff anfordern“ bestätigen).
+- **+** → Name `GitHub`, Zugriff **Admin** → **Generieren**. *Admin* ist nötig, damit GitHub die App selbst signieren darf.
+- **API-Schlüssel herunterladen** – das geht nur ein einziges Mal. Die Datei heißt `AuthKey_XXXXXXXXXX.p8`.
+- Notiere die **Schlüssel-ID** (in der Liste) und die **Issuer-ID** (oben über der Liste).
+
+**5. Team-ID nachsehen**
+- [developer.apple.com/account](https://developer.apple.com/account) → **Mitgliedschaftsdetails** → **Team-ID** (10 Zeichen).
+
+**6. Die vier Werte bei GitHub hinterlegen**
+- [github.com/Feuerbrand/led-app](https://github.com/Feuerbrand/led-app) → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**, viermal:
+
+  | Name | Wert |
+  | --- | --- |
+  | `ASC_KEY_ID` | Schlüssel-ID aus Schritt 4 |
+  | `ASC_ISSUER_ID` | Issuer-ID aus Schritt 4 |
+  | `ASC_KEY_P8` | den **ganzen Text** der `.p8`-Datei (mit dem Editor öffnen, alles kopieren, inklusive der Zeilen `-----BEGIN PRIVATE KEY-----` und `-----END PRIVATE KEY-----`) |
+  | `APPLE_TEAM_ID` | Team-ID aus Schritt 5 |
+
+- Secrets sind nur für die Builds sichtbar, nicht für Besucher der Seite. Den Schlüssel sonst nirgends weitergeben und die `.p8`-Datei danach sicher aufbewahren oder löschen.
+
+**7. Dich als Tester eintragen**
+- App Store Connect → deine App → **TestFlight** → bei **Interne Tests** auf **+** → Gruppe `Ich` → dich selbst hinzufügen → **Automatische Verteilung** eingeschaltet lassen.
+
+**8. Ersten Build starten**
+- Oben **Actions** → **iOS-App bauen** → **Run workflow** (oder mir Bescheid sagen, dann stoße ich ihn an). Der Schritt **TestFlight** baut, signiert und lädt hoch; danach verarbeitet Apple die Version noch 10–30 Minuten.
+
+**9. Auf dem iPhone installieren**
+- **TestFlight** aus dem App Store laden, die Einladungs-E-Mail von Apple öffnen (oder TestFlight öffnen) → **LED Control** → **Installieren**.
+- In TestFlight bei LED Control **Automatische Updates** einschalten.
+
+Ab dann kommt jede Änderung an der App von selbst aufs iPhone. GitHub pausiert monatliche Läufe, wenn 60 Tage lang nichts am Repository geändert wurde; dann auf der Seite **Actions** einmal **Enable workflow** drücken.
+
 ## Die .ipa herunterladen
 
 - **Fertige Versionen:** im Repository rechts unter **Releases** → oberste Version → `LEDControl.ipa`.
@@ -91,6 +145,7 @@ Die App öffnet sich dafür kurz, verbindet sich und führt den Befehl aus.
 
 - Jede Änderung im Ordner `ios/` auf dem Zweig `main` baut die App neu und veröffentlicht sie als **GitHub-Release** `ios-v1.1.<Nummer>` mit `LEDControl.ipa` und der AltStore-Quelle `altstore.json`. Auf anderen Zweigen wird nur gebaut, nicht veröffentlicht.
 - **AltStore** liest die Quelle und bietet das Update an.
+- **TestFlight** (Weg 3): Sind die Secrets eingerichtet, lädt jeder Build die App zusätzlich zu Apple hoch – auch von anderen Zweigen, damit du Änderungen vor dem Übernehmen testen kannst. TestFlight aktualisiert die App dann von selbst; die App zeigt in diesem Fall keinen eigenen Update-Hinweis.
 - **Die App** sieht beim Öffnen nach (höchstens alle 30 Minuten, abschaltbar unter **Mehr**) und zeigt „Update verfügbar“. Selbst austauschen kann sich eine App unter iOS nicht – das übernimmt AltStore oder Sideloadly.
 
 ## Alle 7 Tage erneuern (kostenlose Apple-ID)
@@ -106,9 +161,8 @@ Weitere Grenzen der kostenlosen Apple-ID: höchstens **3** so installierte Apps 
 
 Das [Apple Developer Program](https://developer.apple.com/programs/) kostet 99 US-Dollar im Jahr (in Deutschland rund 99 €).
 
-- Die Signatur gilt **ein Jahr** statt 7 Tage.
-- Die Grenze von 3 Apps entfällt.
-- Der Weg bleibt derselbe (AltStore oder Sideloadly mit der bezahlten Apple-ID). Zusätzlich möglich wären TestFlight oder ein alternativer Marktplatz in der EU; dafür müsste der Build-Workflow die App selbst signieren. Das ist hier nicht eingerichtet.
+- **TestFlight** wird möglich: Installation und Updates ohne PC und Kabel, siehe [Weg 3](#weg-3-apple-entwickler-account-und-testflight--ohne-pc-und-kabel). Der Build-Workflow ist dafür schon eingerichtet und wartet nur auf die vier Secrets.
+- Mit AltStore oder Sideloadly gilt die Signatur **ein Jahr** statt 7 Tage, und die Grenze von 3 Apps entfällt.
 
 Für die App selbst macht es keinen Unterschied.
 
