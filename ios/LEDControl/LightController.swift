@@ -138,6 +138,8 @@ final class LightController {
 
     /// Bildschirm anlassen, solange ein Effekt der App läuft (sonst hält iOS die App an)
     var keepAwake: Bool {
+        // Timer und Sonnenaufgang laufen nur, solange die App offen ist
+        if sleepTimer != nil || sunrise != nil { return true }
         if demo && allLook.flowID != nil { return true }
         return hub.targets.contains { looks[$0.id]?.flowID != nil }
     }
@@ -636,6 +638,156 @@ final class LightController {
         scenes.removeAll { $0.id == scene.id }
         if sceneID == scene.id { sceneID = nil }
         Store.save(scenes, key: Self.scenesKey)
+    }
+
+    // MARK: - Hauptmenü: Stimmungen, Musik, Würfeln, Sonnenaufgang, Timer
+
+    /// Zeitraum, z. B. für den Timer oder den Sonnenaufgang
+    struct Ramp: Equatable {
+        let start: Date
+        let seconds: Double
+
+        var end: Date { start.addingTimeInterval(seconds) }
+
+        /// 0 = gerade gestartet … 1 = abgelaufen
+        func progress(at now: Date) -> Double {
+            seconds > 0 ? min(max(now.timeIntervalSince(start) / seconds, 0), 1) : 1
+        }
+    }
+
+    /// Läuft gerade ein Sonnenaufgang?
+    private(set) var sunrise: Ramp? = nil
+    /// Läuft der Timer, nach dem alle Lichter ausgehen?
+    private(set) var sleepTimer: Ramp? = nil
+
+    /// Szene auf ein bestimmtes Ziel legen (Stimmungen im Hauptmenü wirken auf alle Lichter)
+    func apply(_ scene: LightScene, to t: Target) { applyScene(scene, t) }
+
+    /// Effekt für ein bestimmtes Ziel an- oder ausschalten (Musik-Kachel im Hauptmenü)
+    func toggleFlow(_ f: Flow, for t: Target) {
+        if t == target {
+            swatch = nil
+            bar = nil
+            sceneID = nil
+        }
+        applyFlow(f, t, toggle: true)
+    }
+
+    /// Helligkeit eines bestimmten Ziels (Leiste auf der Licht-Karte im Hauptmenü)
+    func setBrightness(_ percent: Int, for t: Target) { applyBrightness(percent, t) }
+
+    /// Würfeln: jedes Licht bekommt eine neue, kräftige Farbe, gut über den Farbkreis verteilt
+    func shuffleColors() {
+        let lights = lightsOf(.all)
+        let start = Double.random(in: 0..<360)
+        func hue(_ i: Int) -> RGB {
+            ColorMath.hsv((start + Double(i) * 137.5).truncatingRemainder(dividingBy: 360), 1, 1)
+        }
+        if target == .all {
+            swatch = nil
+            bar = nil
+            sceneID = nil
+        }
+        if lights.isEmpty {
+            applyColor(hue(0), .all, instant: false)
+            return
+        }
+        for (i, light) in lights.enumerated() {
+            applyColor(hue(i), .light(light.id), instant: false)
+        }
+        // „Alle Lichter“ merkt sich die erste Farbe, ohne die Lichter wieder gleich zu machen
+        allLook.power = true
+        allLook.base = hue(0)
+        allLook.flowID = nil
+        allLook.builtin = nil
+        allLook.builtinFamily = nil
+        fade([Self.allKey], to: hue(0))
+        saveSoon()
+        stopMeterIfUnused()
+        note("Gewürfelt: \(lights.count) neue Farben")
+    }
+
+    /// Farben des Sonnenaufgangs: von dunklem Rot über Orange bis Warmweiß
+    private static let sunriseStops = [
+        RGB(30, 2, 0), RGB(120, 14, 0), RGB(220, 50, 0), RGB(255, 110, 10),
+        RGB(255, 165, 70), RGB(255, 200, 135), RGB(255, 214, 170),
+    ]
+
+    /// Farbe des Sonnenaufgangs an der Stelle k (0…1)
+    static func sunriseColor(_ k: Double) -> RGB {
+        let stops = sunriseStops
+        let x = min(max(k, 0), 1) * Double(stops.count - 1)
+        let i = min(Int(x.rounded(.down)), stops.count - 2)
+        let e = x - Double(i)
+        let a = stops[i]
+        let b = stops[i + 1]
+        func lerp(_ p: Int, _ q: Int) -> Int { ColorMath.jsRound(Double(p) + Double(q - p) * e) }
+        return RGB(lerp(a.r, b.r), lerp(a.g, b.g), lerp(a.b, b.b))
+    }
+
+    /// Sonnenaufgang auf allen Lichtern: langsam von dunklem Rot bis Warmweiß, danach bleibt es hell
+    func startSunrise(seconds: Double = 90) {
+        let t = Target.all
+        if t == target {
+            swatch = nil
+            bar = nil
+            sceneID = nil
+        }
+        if lookOf(t).power != true { applyPower(true, t) }
+        applyBrightness(100, t)
+        update(t) {
+            $0.flowID = nil
+            $0.builtin = nil
+            $0.builtinFamily = nil
+        }
+        stopMeterIfUnused()
+        let ids = ids(for: t)
+        let my = claim(ids)
+        let ramp = Ramp(start: Date(), seconds: seconds)
+        sunrise = ramp
+        note("Sonnenaufgang startet (\(Int(seconds)) s)")
+        Task { @MainActor [self] in
+            while true {
+                let mine = ids.filter { owner[$0] == my }
+                if mine.isEmpty { break }
+                let k = ramp.progress(at: Date())
+                let c = Self.sunriseColor(k)
+                for id in mine { emit(c, id) }
+                if k >= 1 {
+                    update(t) { $0.base = c }
+                    for id in mine { emit(c, id, force: true) }
+                    release(mine)
+                    note("Sonnenaufgang fertig")
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            if sunrise == ramp { sunrise = nil }
+        }
+    }
+
+    /// Timer: nach so vielen Minuten gehen alle Lichter aus. Läuft, solange die App offen ist.
+    func startSleepTimer(minutes: Int) {
+        let ramp = Ramp(start: Date(), seconds: Double(max(minutes, 1)) * 60)
+        sleepTimer = ramp
+        note("Timer: in \(minutes) min gehen alle Lichter aus")
+        Task { @MainActor [self] in
+            while sleepTimer == ramp {
+                if ramp.progress(at: Date()) >= 1 {
+                    sleepTimer = nil
+                    applyPower(false, .all)
+                    note("Timer abgelaufen – alle Lichter aus")
+                    return
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    func cancelSleepTimer() {
+        guard sleepTimer != nil else { return }
+        sleepTimer = nil
+        note("Timer beendet")
     }
 
     // MARK: - Kurzbefehle (ledcontrol://…), wirken immer auf alle Lichter

@@ -2,7 +2,8 @@
 
 Die Webseite aus diesem Repository als echte iPhone-App – ohne Bluefy, mit mehr Funktionen:
 
-- **Hauptmenü wie bei Lotus Lamp X:** jedes Licht als Karte, die in seiner Farbe leuchtet, mit eigenem Ein/Aus-Knopf. Antippen öffnet die Steuerung nur für dieses Licht, **Alle Lichter** steuert alle zusammen.
+- **Hauptmenü:** oben **Stimmungen** als animierte Poster zum Wischen (Kino, Party, Entspannen, Aufwachen und eigene), darunter die Lichter als **Karten im Stapel wie in der Wallet**: jede leuchtet im Farbverlauf ihres Lichts, mit Schalter und Helligkeit zum Ziehen. Antippen holt eine Karte nach vorne, nochmal antippen öffnet die Steuerung nur für dieses Licht, **Alle Lichter** steuert alle zusammen.
+- **Schnell:** **Timer** (alle Lichter gehen nach 15–90 min aus), **Musik** mit einem Tippen, **Würfeln** (jedes Licht bekommt eine neue Farbe) und **Aufwachen**, ein 90-Sekunden-Sonnenaufgang von Dunkelrot bis Warmweiß.
 - **Mehrere Lichter:** die ELK-BLEDOM-Leiste und Lichter, die sonst nur **Lotus Lamp X** steuert (MELK-Geräte). Jedes Licht hat seine eigene Farbe, Helligkeit und seinen eigenen Effekt.
 - **Hinzufügen mit Namen:** **+** zeigt nur passende LED-Lichter in der Nähe; beim Hinzufügen vergibst du gleich einen eigenen Namen (z. B. „Wohnzimmer“).
 - **Farbe:** Farbrad zum Ziehen, Weißton-Leiste, 12 Farbfelder, Helligkeit.
@@ -209,7 +210,9 @@ Diese Punkte konnten ohne iPhone und Lichter nicht ausprobiert werden:
 - [ ] **Szenen:** antippen, speichern, lange drücken zum Löschen.
 - [ ] **MELK-Licht** (Lotus Lamp X vorher schließen): über **+** hinzufügen und benennen, es verbindet sich (nach rund 2 s), An/Aus, Helligkeit, Farbe und seine eigenen eingebauten Effekte wirken.
 - [ ] **Einzeln und gemeinsam:** Karte antippen steuert nur dieses Licht, **Alle Lichter** steuert beide; die **Welle** lässt einen Effekt von Licht zu Licht wandern.
-- [ ] **Karten:** leuchten in der Farbe des Lichts, Ein/Aus-Knopf, gedrückt halten → Blinken lassen, Umbenennen, Entfernen.
+- [ ] **Karten:** leuchten in der Farbe des Lichts, Ein/Aus-Knopf, gedrückt halten → Blinken lassen, Umbenennen, Entfernen. Im Stapel holt Antippen eine Karte nach vorne; die Leiste auf der vorderen Karte ändert die Helligkeit.
+- [ ] **Stimmungen:** Poster wischen und antippen, die Lichter wechseln; **Aufwachen** wird in 90 s hell; **Eigene Stimmung** öffnet die Szenen.
+- [ ] **Schnell:** Timer schaltet nach Ablauf alles aus, Musik pulsiert, Würfeln gibt jedem Licht eine andere Farbe.
 - [ ] **Neu verbinden:** Licht kurz vom Strom nehmen, außer Reichweite gehen, Bluetooth aus und an, App in den Hintergrund und zurück – jedes Mal verbindet sie von allein wieder.
 - [ ] **Siri:** „Hey Siri, LED Control an“ und „… aus“, „Schalte Wohnzimmer mit LED Control an“, „Starte Kino mit LED Control“; Knopf „Kurzbefehle“ in den Einstellungen.
 - [ ] **Abzeichen:** Die ELK-Leiste zeigt „RGB“; ein Licht mit einzeln steuerbaren LEDs zeigt „RGBIC“ und unter Effekte das Feld **Lauflicht**.
@@ -234,7 +237,7 @@ Wenn etwas hakt, hilft das **Protokoll** in den **Einstellungen**: den Text lang
 | `LEDControl/LightController.swift` | Zustand und Lichtlogik (An/Aus, Farbe, Flows, Musik, Szenen, Kurzbefehle) |
 | `LEDControl/ColorMath.swift`, `Flows.swift`, `SendQueue.swift` | Farbrechnung, Flow-Effekte und Sende-Regel, aus `index.html` übernommen |
 | `LEDControl/SoundMeter.swift`, `Scenes.swift`, `Updater.swift`, `Intents.swift` | Musik-Pegel, Szenen und Speichern, Update-Prüfung, Siri/Kurzbefehle |
-| `LEDControl/ContentView.swift`, `HomeView.swift`, `AddLightSheet.swift`, `ControlView.swift`, `SettingsView.swift` | Hauptmenü, Hinzufügen, Steuerung, Einstellungen |
+| `LEDControl/ContentView.swift`, `HomeView.swift`, `MoodArt.swift`, `AddLightSheet.swift`, `ControlView.swift`, `SettingsView.swift` | Hauptmenü mit Stimmungen und Kartenstapel, Hinzufügen, Steuerung, Einstellungen |
 | `LEDControl/ColorWheel.swift`, `Components.swift` | Farbrad und gemeinsame Bausteine der Oberfläche |
 | `LEDControl/Backdrop.swift`, `Controls.swift`, `Icons.swift`, `Theme.swift` | Hintergrund, Lampe, Bedienelemente, Symbole, Farben und Schrift |
 | `LEDControl/Fonts/` | Geist und Geist Mono als `.ttf`, umgewandelt aus den `.woff2`-Dateien in `fonts/` (Lizenz: `OFL.txt`) |

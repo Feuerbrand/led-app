@@ -4,6 +4,7 @@ import SwiftUI
 enum IconKind {
     case bluetooth, power, moon, sun, drop, speed, list, chevron
     case lamp, sparkle, sliders, plus, music, download, check, dots, pencil, trash, flash, star
+    case dice
 }
 
 private func pt(_ x: Double, _ y: Double) -> CGPoint {
@@ -147,6 +148,12 @@ struct IconShape: Shape {
             }
             p.addLines(corners)
             p.closeSubpath()
+
+        case .dice:
+            p.addRoundedRect(in: CGRect(x: 4, y: 4, width: 16, height: 16), cornerSize: CGSize(width: 3.5, height: 3.5))
+            for (x, y) in [(8.5, 8.5), (15.5, 8.5), (12.0, 12.0), (8.5, 15.5), (15.5, 15.5)] {
+                p.addEllipse(in: CGRect(x: x - 0.6, y: y - 0.6, width: 1.2, height: 1.2))
+            }
         }
         return fit(p, in: rect)
     }

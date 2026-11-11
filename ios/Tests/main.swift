@@ -226,5 +226,31 @@ let loud = Flow.music.color(at: 0, base: RGB(0, 0, 0), level: 1)
 expect(quiet.peak < 20 && loud == RGB(255, 0, 0), "Musik leise \(quiet), laut \(loud)")
 expect(Flow.everything.count == Flow.all.count + 1, "Musik-Modus fehlt in der Gesamtliste")
 
+// Sonnenaufgang: beginnt dunkelrot, endet warmweiß, wird dabei immer heller
+expect(LightController.sunriseColor(0) == RGB(30, 2, 0), "Sonnenaufgang Anfang \(LightController.sunriseColor(0))")
+expect(LightController.sunriseColor(1) == RGB(255, 214, 170), "Sonnenaufgang Ende \(LightController.sunriseColor(1))")
+expect(LightController.sunriseColor(-1) == RGB(30, 2, 0) && LightController.sunriseColor(2) == RGB(255, 214, 170), "Sonnenaufgang Grenzen")
+var lastSum = -1
+var brighter = true
+for i in 0...100 {
+    let c = LightController.sunriseColor(Double(i) / 100)
+    let sum = c.r + c.g + c.b
+    if sum < lastSum { brighter = false }
+    lastSum = sum
+}
+expect(brighter, "Sonnenaufgang wird nie dunkler")
+
+// Timer und Sonnenaufgang: Fortschritt 0…1
+let rampStart = Date(timeIntervalSince1970: 1000)
+let ramp = LightController.Ramp(start: rampStart, seconds: 60)
+expect(ramp.progress(at: rampStart) == 0 && ramp.progress(at: rampStart.addingTimeInterval(30)) == 0.5
+       && ramp.progress(at: rampStart.addingTimeInterval(120)) == 1 && ramp.progress(at: rampStart.addingTimeInterval(-5)) == 0,
+       "Fortschritt von Timer und Sonnenaufgang")
+expect(ramp.end == rampStart.addingTimeInterval(60), "Ende des Timers")
+
+// Würfeln ohne Lichter: „Alle Lichter“ bekommt eine kräftige Farbe
+light.shuffleColors()
+expect(light.allLook.power == true && light.allLook.flowID == nil && light.allLook.base.peak == 255, "Würfeln \(light.allLook.base)")
+
 print("\(checks) Prüfungen, \(failures) Fehler")
 exit(failures == 0 ? 0 : 1)

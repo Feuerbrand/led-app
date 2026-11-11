@@ -13,7 +13,9 @@ LED-Leisten und -Lampen mit Bluetooth, die sich als **ELK-BLEDOM** (bzw. ELK-BLE
 
 ## Mehrere Lichter
 
-Im Hauptmenü über **+** jedes Licht hinzufügen und benennen. Eine Karte antippen steuert nur dieses Licht, **Alle Lichter** steuert alle zusammen – auf Wunsch mit **Welle**, bei der ein Effekt von Licht zu Licht wandert. Karte gedrückt halten: blinken lassen, umbenennen, entfernen.
+Im Hauptmenü über **+** jedes Licht hinzufügen und benennen. Die Lichter liegen als Karten übereinander: Antippen holt eine Karte nach vorne, nochmal antippen steuert nur dieses Licht. **Alle Lichter** steuert alle zusammen – auf Wunsch mit **Welle**, bei der ein Effekt von Licht zu Licht wandert. Karte gedrückt halten: blinken lassen, umbenennen, entfernen.
+
+Der **Timer** im Hauptmenü schaltet alle Lichter nach der gewählten Zeit aus. Er läuft, solange die App offen ist; der Bildschirm bleibt so lange an.
 
 ## Lauflicht entlang der Leiste
 

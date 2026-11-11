@@ -202,7 +202,13 @@ struct ControlView: View {
             Text("Die Verbindung wird getrennt. Du kannst das Licht jederzeit wieder hinzufügen.")
         }
         .pageBackground()
-        .onAppear { light.select(target) }
+        .onAppear {
+            light.select(target)
+            if let start = nav.section {
+                section = start
+                nav.section = nil
+            }
+        }
     }
 }
 

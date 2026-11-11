@@ -12,6 +12,8 @@ enum Route: Hashable {
 @Observable
 final class Navigator {
     var path: [Route] = []
+    /// Bereich, mit dem die nächste Steuerseite öffnet (z. B. „Szenen“ aus dem Hauptmenü)
+    var section: ControlSection? = nil
 }
 
 /// Grundgerüst: Hauptmenü mit den Lichtern, von dort Steuerung und Einstellungen
