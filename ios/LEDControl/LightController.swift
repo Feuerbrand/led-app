@@ -80,6 +80,8 @@ final class LightController {
     private(set) var scenes: [LightScene] = []
     /// Zuletzt gewählte Szene (für die Markierung)
     private(set) var sceneID: UUID? = nil
+    /// Zuletzt benutzte Farben, die neueste vorne (höchstens sechs)
+    private(set) var recentColors: [RGB] = []
 
     // Zustand der geöffneten Steuerung
     var look: LightLook { lookOf(target) }
@@ -139,7 +141,7 @@ final class LightController {
     /// Bildschirm anlassen, solange ein Effekt der App läuft (sonst hält iOS die App an)
     var keepAwake: Bool {
         // Timer und Sonnenaufgang laufen nur, solange die App offen ist
-        if sleepTimer != nil || sunrise != nil { return true }
+        if sleepTimer != nil || sunrise != nil || goodnight != nil { return true }
         if demo && allLook.flowID != nil { return true }
         return hub.targets.contains { looks[$0.id]?.flowID != nil }
     }
@@ -166,11 +168,18 @@ final class LightController {
     @ObservationIgnored private var glowAt: [UUID: Double] = [:]
     @ObservationIgnored private var pending: [() -> Void] = []      // Kurzbefehl, der auf die Verbindung wartet
     @ObservationIgnored private var saveTask: Task<Void, Never>? = nil
+    @ObservationIgnored private var recentTask: Task<Void, Never>? = nil
+    /// Helligkeit vor „Gute Nacht“: beim nächsten Einschalten wieder so hell
+    @ObservationIgnored private var wakeBrightness: Int? = nil
 
     private static let whites = [RGB(255, 147, 41), RGB(255, 214, 170), RGB(255, 255, 255), RGB(201, 226, 255)]
     private static let stateKey = "led-app.state"
     private static let looksKey = "led-app.looks"
     private static let scenesKey = "led-app.scenes"
+    private static let recentKey = "led-app.recent"
+    /// Farben für „Zuletzt benutzt“, bevor man selbst welche gewählt hat
+    static let recentDefaults = [RGB(255, 59, 122), RGB(138, 75, 255), RGB(255, 179, 107),
+                                 RGB(0, 229, 255), RGB(255, 42, 42), RGB(255, 255, 255)]
 
     private static let clock: DateFormatter = {
         let f = DateFormatter()
@@ -195,6 +204,8 @@ final class LightController {
         allLook.flowID = nil
         for id in looks.keys { looks[id]?.flowID = nil }
         scenes = Store.load([LightScene].self, key: Self.scenesKey) ?? LightScene.starters
+        let recent = (Store.load([String].self, key: Self.recentKey) ?? []).compactMap { RGB(hexString: $0) }
+        recentColors = recent.isEmpty ? Self.recentDefaults : recent
         hub.onLog = { [weak self] message in self?.note(message) }
         hub.onReady = { [weak self] light in self?.sync(light) }
         note("Bereit. Andere Licht-Apps vorher schließen!")
@@ -473,17 +484,31 @@ final class LightController {
 
     // MARK: - Bedienung (wirkt auf die geöffnete Steuerung)
 
-    func setPower(_ on: Bool) { applyPower(on, target) }
+    func setPower(_ on: Bool) {
+        cancelGoodnight()
+        applyPower(on, target)
+    }
 
     private func applyPower(_ on: Bool, _ t: Target) {
         update(t) { $0.power = on }
         send(.power(on), to: t)
+        // Nach „Gute Nacht“ wieder so hell wie vorher
+        if on, let b = wakeBrightness {
+            wakeBrightness = nil
+            applyBrightness(b, t)
+        }
     }
 
     /// Ein einzelnes Licht direkt an- oder ausschalten (Knopf auf der Karte im Hauptmenü)
-    func setPower(_ on: Bool, for t: Target) { applyPower(on, t) }
+    func setPower(_ on: Bool, for t: Target) {
+        cancelGoodnight()
+        applyPower(on, t)
+    }
 
-    func setBrightness(_ percent: Int) { applyBrightness(percent, target) }
+    func setBrightness(_ percent: Int) {
+        cancelGoodnight()
+        applyBrightness(percent, target)
+    }
 
     private func applyBrightness(_ percent: Int, _ t: Target) {
         update(t) { $0.brightness = percent }
@@ -504,6 +529,33 @@ final class LightController {
         bar = which
         sceneID = nil
         applyColor(c, target, instant: instant)
+        rememberSoon(c)
+    }
+
+    // MARK: - Zuletzt benutzte Farben
+
+    /// Farbe merken, sobald sie eine Weile gewählt bleibt (beim Ziehen über das Farbrad nicht jede Zwischenfarbe)
+    private func rememberSoon(_ c: RGB) {
+        recentTask?.cancel()
+        recentTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            if Task.isCancelled { return }
+            self?.remember(c)
+        }
+    }
+
+    private func remember(_ c: RGB) {
+        if recentColors.contains(where: { Self.similar($0, c) }) { return }
+        var list = recentColors
+        list.insert(c, at: 0)
+        if list.count > 6 { list.removeLast(list.count - 6) }
+        recentColors = list
+        Store.save(list.map { $0.hex }, key: Self.recentKey)
+    }
+
+    /// Fast dieselbe Farbe (kommt nicht doppelt in die Liste)
+    static func similar(_ a: RGB, _ b: RGB) -> Bool {
+        abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b) < 30
     }
 
     private func applyColor(_ c: RGB, _ t: Target, instant: Bool) {
@@ -609,7 +661,10 @@ final class LightController {
 
     // MARK: - Szenen
 
-    func apply(_ scene: LightScene) { applyScene(scene, target) }
+    func apply(_ scene: LightScene) {
+        cancelGoodnight()
+        applyScene(scene, target)
+    }
 
     private func applyScene(_ scene: LightScene, _ t: Target) {
         applyBrightness(scene.brightness, t)
@@ -661,7 +716,10 @@ final class LightController {
     private(set) var sleepTimer: Ramp? = nil
 
     /// Szene auf ein bestimmtes Ziel legen (Stimmungen im Hauptmenü wirken auf alle Lichter)
-    func apply(_ scene: LightScene, to t: Target) { applyScene(scene, t) }
+    func apply(_ scene: LightScene, to t: Target) {
+        cancelGoodnight()
+        applyScene(scene, t)
+    }
 
     /// Effekt für ein bestimmtes Ziel an- oder ausschalten (Musik-Kachel im Hauptmenü)
     func toggleFlow(_ f: Flow, for t: Target) {
@@ -674,7 +732,10 @@ final class LightController {
     }
 
     /// Helligkeit eines bestimmten Ziels (Leiste auf der Licht-Karte im Hauptmenü)
-    func setBrightness(_ percent: Int, for t: Target) { applyBrightness(percent, t) }
+    func setBrightness(_ percent: Int, for t: Target) {
+        cancelGoodnight()
+        applyBrightness(percent, t)
+    }
 
     /// Würfeln: jedes Licht bekommt eine neue, kräftige Farbe, gut über den Farbkreis verteilt
     func shuffleColors() {
@@ -727,6 +788,7 @@ final class LightController {
 
     /// Sonnenaufgang auf allen Lichtern: langsam von dunklem Rot bis Warmweiß, danach bleibt es hell
     func startSunrise(seconds: Double = 90) {
+        cancelGoodnight()
         let t = Target.all
         if t == target {
             swatch = nil
@@ -788,6 +850,57 @@ final class LightController {
         guard sleepTimer != nil else { return }
         sleepTimer = nil
         note("Timer beendet")
+    }
+
+    // MARK: - Gute Nacht
+
+    /// Läuft gerade „Gute Nacht“?
+    private(set) var goodnight: Ramp? = nil
+
+    /// Gute Nacht: alle Lichter werden warm und dimmen langsam herunter, am Ende gehen sie aus.
+    /// Läuft, solange die App offen ist (der Bildschirm bleibt so lange an).
+    func startGoodnight(minutes: Double = 10) {
+        let t = Target.all
+        if t == target {
+            swatch = nil
+            bar = nil
+            sceneID = nil
+        }
+        let from = max(lookOf(t).brightness, 10)
+        applyColor(RGB(255, 110, 25), t, instant: false)
+        let ramp = Ramp(start: Date(), seconds: minutes * 60)
+        goodnight = ramp
+        note("Gute Nacht: in \(Int(minutes)) min dunkel")
+        Task { @MainActor [self] in
+            var last = from
+            while goodnight == ramp {
+                // Selbst ausgeschaltet: nichts mehr tun
+                if allLook.power == false {
+                    goodnight = nil
+                    break
+                }
+                let k = ramp.progress(at: Date())
+                if k >= 1 {
+                    goodnight = nil
+                    applyPower(false, t)
+                    wakeBrightness = from
+                    note("Gute Nacht – alle Lichter aus")
+                    break
+                }
+                let b = max(1, Int((Double(from) * (1 - k)).rounded()))
+                if b != last {
+                    last = b
+                    applyBrightness(b, t)
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    func cancelGoodnight() {
+        guard goodnight != nil else { return }
+        goodnight = nil
+        note("Gute Nacht beendet")
     }
 
     // MARK: - Kurzbefehle (ledcontrol://…), wirken immer auf alle Lichter

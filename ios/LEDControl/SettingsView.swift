@@ -2,35 +2,344 @@ import AppIntents
 import SwiftUI
 import UIKit
 
-/// Einstellungen: Updates, Lichter-Optionen, Siri und Kurzbefehle, Protokoll, Info
+/// Einstellungen: nur vier Punkte, jeder öffnet eine eigene Seite
 struct SettingsView: View {
     @Environment(Updater.self) private var updater
 
+    private var updateDetail: String {
+        if let release = updater.available { return "Neu: \(release.version)" }
+        switch updater.status {
+        case .upToDate: return "Aktuell"
+        case .checking: return "…"
+        default: return ""
+        }
+    }
+
     var body: some View {
         Page {
-            PageTitle(title: "Einstellungen", subtitle: "Updates, Lichter, Kurzbefehle und Protokoll")
-            SectionTitle("Updates").rise(1)
-            switch updater.source {
-            case .sideloaded: UpdatesTile().rise(2)
-            case .testFlight: TestFlightTile().rise(2)
-            case .appStore: AppStoreTile().rise(2)
+            BigTitle(text: "Einstellungen")
+            VStack(spacing: 0) {
+                SettingsRow(route: .updates, symbol: "arrow.down.circle.fill", colors: [RGB(59, 209, 111), RGB(26, 154, 74)],
+                            title: "Updates", detail: updateDetail, highlight: updater.available != nil)
+                RowDivider()
+                SettingsRow(route: .shortcuts, symbol: "mic.fill", colors: [RGB(196, 90, 255), RGB(90, 59, 255)],
+                            title: "Siri und Kurzbefehle", detail: "", highlight: false)
+                RowDivider()
+                SettingsRow(route: .manage, symbol: "lightbulb.fill", colors: [RGB(255, 210, 63), RGB(224, 160, 14)],
+                            title: "Lichter verwalten", detail: "", highlight: false)
+                RowDivider()
+                SettingsRow(route: .help, symbol: "lifepreserver.fill", colors: [RGB(59, 176, 255), RGB(26, 90, 255)],
+                            title: "Hilfe und Protokoll", detail: "", highlight: false)
             }
-            SectionTitle("Lichter").rise(3)
-            VStack(spacing: 12) {
-                DemoTile()
-                ShowAllTile()
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1)
             }
-            .rise(4)
-            SectionTitle("Siri & Kurzbefehle").rise(5)
-            ShortcutsTile().rise(6)
-            SectionTitle("Protokoll").rise(7)
-            LogTile().rise(8)
-            AboutTile().rise(9)
-            Footer().rise(10)
+            .padding(.top, 20)
+            .rise(1)
+            Footer().rise(2)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .pageBackground()
+    }
+}
+
+/// Große Überschrift oben auf einer Seite
+struct BigTitle: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.geist(34, 800))
+            .foregroundStyle(Theme.text)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
+            .rise(0)
+    }
+}
+
+/// Zeile mit buntem Symbol wie in den Einstellungen von iOS
+private struct SettingsRow: View {
+    let route: Route
+    let symbol: String
+    let colors: [RGB]
+    let title: String
+    let detail: String
+    let highlight: Bool
+
+    var body: some View {
+        let light: Bool = (colors.first?.perceived ?? 0) > 0.6
+        let stops: [Color] = colors.map { $0.color }
+        NavigationLink(value: route) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(light ? Theme.ink : Color.white)
+                    .frame(width: 34, height: 34)
+                    .background(LinearGradient(colors: stops, startPoint: .topLeading, endPoint: .bottomTrailing),
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text(title)
+                    .font(.geist(16, 500))
+                    .foregroundStyle(Theme.text)
+                Spacer(minLength: 8)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.geist(14, 500))
+                        .foregroundStyle(highlight ? Theme.accent : Theme.muted)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle(scale: 0.98))
+    }
+}
+
+private struct RowDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 1)
+            .padding(.leading, 62)
+    }
+}
+
+// MARK: - Unterseiten
+
+struct UpdatesPage: View {
+    @Environment(Updater.self) private var updater
+
+    var body: some View {
+        Page {
+            BigTitle(text: "Updates")
+            Group {
+                switch updater.source {
+                case .sideloaded: UpdatesTile()
+                case .testFlight: TestFlightTile()
+                case .appStore: AppStoreTile()
+                }
+            }
+            .padding(.top, 20)
+            .rise(1)
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .pageBackground()
+    }
+}
+
+struct ShortcutsPage: View {
+    var body: some View {
+        Page {
+            BigTitle(text: "Siri und Kurzbefehle")
+            ShortcutsTile()
+                .padding(.top, 20)
+                .rise(1)
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .pageBackground()
+    }
+}
+
+/// Lichter umbenennen, trennen, entfernen und hinzufügen; dazu die selteneren Schalter
+struct ManageLightsPage: View {
+    @Environment(LightController.self) private var light
+    @State private var adding = false
+
+    var body: some View {
+        let mine = light.hub.mine
+        Page {
+            BigTitle(text: "Lichter verwalten")
+            VStack(spacing: 10) {
+                ForEach(mine) { item in
+                    ManageRow(item: item)
+                }
+                Button {
+                    adding = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .bold))
+                        Text("Licht hinzufügen")
+                    }
+                }
+                .buttonStyle(AccentButtonStyle())
+                .padding(.top, mine.isEmpty ? 0 : 6)
+            }
+            .padding(.top, 20)
+            .rise(1)
+            SectionTitle("Erweitert").rise(2)
+            VStack(spacing: 12) {
+                DemoTile()
+                ShowAllTile()
+            }
+            .rise(3)
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .pageBackground()
+        .sheet(isPresented: $adding) {
+            AddLightSheet()
+        }
+    }
+}
+
+/// Ein Licht mit seinem Menü
+private struct ManageRow: View {
+    let item: Light
+
+    @Environment(LightController.self) private var light
+    @State private var renaming = false
+    @State private var newName = ""
+    @State private var confirmRemove = false
+
+    private var stateText: String {
+        if !item.enabled { return "Getrennt" }
+        switch item.state {
+        case .on: return "Verbunden"
+        case .busy: return item.rssi == nil ? "Nicht in Reichweite" : "Verbindet …"
+        case .off: return "Getrennt"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.geist(16, 600))
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                Text(item.title == item.name ? stateText : "\(item.name) · \(stateText)")
+                    .font(.geist(13, 500))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if item.state == .on || item.rssi != nil {
+                SignalBars(rssi: item.rssi)
+            }
+            Menu {
+                Button {
+                    light.identify(item)
+                } label: {
+                    Label("Blinken lassen", systemImage: "light.max")
+                }
+                .disabled(item.state != .on)
+                Button {
+                    newName = item.title
+                    renaming = true
+                } label: {
+                    Label("Umbenennen", systemImage: "pencil")
+                }
+                Button {
+                    light.hub.setEnabled(item, !item.enabled)
+                } label: {
+                    Label(item.enabled ? "Trennen" : "Verbinden", systemImage: item.enabled ? "bolt.slash" : "bolt")
+                }
+                Button(role: .destructive) {
+                    confirmRemove = true
+                } label: {
+                    Label("Entfernen", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.text)
+                    .frame(width: 38, height: 38)
+                    .background(Color.white.opacity(0.07), in: Circle())
+            }
+            .accessibilityLabel("\(item.title) bearbeiten")
+        }
+        .tile()
+        .alert("Licht umbenennen", isPresented: $renaming) {
+            TextField(item.name, text: $newName)
+            Button("Sichern") { light.hub.rename(item, to: newName == item.name ? "" : newName) }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Gerätename: \(item.name)")
+        }
+        .confirmationDialog("\(item.title) entfernen?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Entfernen", role: .destructive) { light.hub.remove(item) }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Die Verbindung wird getrennt. Du kannst das Licht jederzeit wieder hinzufügen.")
+        }
+    }
+}
+
+/// Kurze Hilfe, Einführung, Protokoll und Infos zur App
+struct HelpPage: View {
+    @AppStorage("led-app.onboarded") private var onboarded = true
+
+    private static let topics: [(String, String)] = [
+        ("Licht wird nicht gefunden",
+         "Licht einschalten, in die Nähe gehen und andere Licht-Apps ganz schließen – ein Licht kann immer nur mit einer App verbunden sein."),
+        ("Effekt hört auf",
+         "Die bunten Effekte rechnet die App selbst. Sie laufen, solange die App offen ist; der Bildschirm bleibt dabei an. „Effekte in der Leiste“ laufen auch ohne App."),
+        ("Musik",
+         "Die Lichter folgen dem Takt. Die App hört dafür über das Mikrofon mit, nimmt aber nichts auf."),
+        ("Gute Nacht und Aufwachen",
+         "Gute Nacht macht alle Lichter warm und dimmt sie in 10 Minuten bis aus. Aufwachen ist ein Sonnenaufgang in 90 Sekunden. Beides läuft, solange die App offen ist."),
+        ("Szenen",
+         "Im Hauptmenü auf „Neue Szene“ tippen oder im Licht über ⋯ „Als Szene speichern“. Gedrückt halten löscht eine Szene."),
+    ]
+
+    var body: some View {
+        Page {
+            BigTitle(text: "Hilfe")
+            VStack(spacing: 10) {
+                ForEach(Self.topics, id: \.0) { topic in
+                    HelpTopic(title: topic.0, text: topic.1)
+                }
+                Button {
+                    onboarded = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Einführung nochmal ansehen")
+                    }
+                }
+                .buttonStyle(OutlineButtonStyle())
+                .padding(.top, 4)
+            }
+            .padding(.top, 20)
+            .rise(1)
+            SectionTitle("Protokoll").rise(2)
+            LogTile().rise(3)
+            AboutTile().rise(4)
+            Footer().rise(5)
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .pageBackground()
+    }
+}
+
+private struct HelpTopic: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.geist(15, 700))
+                .foregroundStyle(Theme.text)
+            Text(text)
+                .font(.geist(13, 400))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(2)
+        }
+        .tile()
     }
 }
 

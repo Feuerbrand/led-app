@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Bereiche der Steuerseite
 enum ControlSection: String, CaseIterable, Identifiable {
-    case color, effects, scenes
+    case color, effects
 
     var id: String { rawValue }
 
@@ -10,21 +10,24 @@ enum ControlSection: String, CaseIterable, Identifiable {
         switch self {
         case .color: return "Farbe"
         case .effects: return "Effekte"
-        case .scenes: return "Szenen"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .color: return "paintpalette.fill"
+        case .effects: return "sparkles"
         }
     }
 
     /// Für die automatischen App-Store-Bilder: Startargument „-screenshotPage effects“
     static var initial: ControlSection {
-        switch UserDefaults.standard.string(forKey: "screenshotPage") {
-        case "effects": return .effects
-        case "scenes": return .scenes
-        default: return .color
-        }
+        UserDefaults.standard.string(forKey: "screenshotPage") == "effects" ? .effects : .color
     }
 }
 
-/// Steuerung für ein Licht oder für alle Lichter zusammen
+/// Steuerung für ein Licht oder für alle Lichter zusammen:
+/// oben Name, Schalter und große Helligkeit, darunter nur noch Farbe und Effekte
 struct ControlView: View {
     let target: Target
 
@@ -34,6 +37,8 @@ struct ControlView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmRemove = false
+    @State private var naming = false
+    @State private var sceneName = ""
 
     private var item: Light? {
         if case .light(let id) = target { return light.hub.light(id: id) }
@@ -43,67 +48,56 @@ struct ControlView: View {
     var body: some View {
         let usable: Bool = light.demo || light.isConnected(target)
         Page {
-            ControlHero(target: target, item: item)
-                .padding(.top, 4)
+            ControlHeader(target: target, item: item)
                 .rise(0)
 
-            SectionTabs(selection: $section)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+            BrightnessBar(target: target)
+                .padding(.top, 18)
                 .rise(1)
+
+            SectionTabs(selection: $section)
+                .padding(.top, 14)
+                .padding(.bottom, 20)
+                .rise(2)
 
             Group {
                 switch section {
                 case .color: ColorSection()
                 case .effects: EffectsSection(target: target)
-                case .scenes: ScenesSection()
                 }
             }
             .opacity(usable ? 1 : 0.35)
             .allowsHitTesting(usable)
             .animation(.easeOut(duration: 0.3), value: usable)
-            .rise(2)
+            .rise(3)
 
             if !usable {
-                Hint(text: "Dieses Licht ist gerade nicht verbunden. Ist es eingeschaltet und in der Nähe? Andere Licht-Apps ganz schließen.")
+                Hint(text: "Nicht verbunden. Ist das Licht an und in der Nähe? Andere Licht-Apps ganz schließen.")
                     .padding(.top, 12)
             }
         }
+        .background(alignment: .top) { ControlGlow(target: target) }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let item {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            light.identify(item)
-                        } label: {
-                            Label("Blinken lassen", systemImage: "light.max")
-                        }
-                        .disabled(item.state != .on)
-                        Button {
-                            newName = item.title
-                            renaming = true
-                        } label: {
-                            Label("Umbenennen", systemImage: "pencil")
-                        }
-                        Button {
-                            light.hub.setEnabled(item, !item.enabled)
-                        } label: {
-                            Label(item.enabled ? "Trennen" : "Verbinden", systemImage: item.enabled ? "bolt.slash" : "bolt")
-                        }
-                        Button(role: .destructive) {
-                            confirmRemove = true
-                        } label: {
-                            Label("Entfernen", systemImage: "trash")
-                        }
-                    } label: {
-                        Icon(kind: .dots, size: 20, color: Theme.text)
-                            .frame(width: 32, height: 32)
-                    }
-                    .accessibilityLabel("Licht bearbeiten")
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    menuItems
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .frame(width: 32, height: 32)
                 }
+                .accessibilityLabel("Mehr")
             }
+        }
+        .alert("Als Szene speichern", isPresented: $naming) {
+            TextField("Name", text: $sceneName)
+            Button("Speichern") { light.saveScene(named: sceneName) }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Merkt sich Farbe oder Effekt, Helligkeit und Tempo. Die Szene erscheint im Hauptmenü.")
         }
         .alert("Licht umbenennen", isPresented: $renaming) {
             TextField(item?.name ?? "", text: $newName)
@@ -134,30 +128,46 @@ struct ControlView: View {
             }
         }
     }
+
+    /// Menü hinter ⋯
+    @ViewBuilder
+    private var menuItems: some View {
+        Button {
+            sceneName = light.suggestedSceneName
+            naming = true
+        } label: {
+            Label("Als Szene speichern", systemImage: "bookmark")
+        }
+        if let item {
+            Button {
+                light.identify(item)
+            } label: {
+                Label("Blinken lassen", systemImage: "light.max")
+            }
+            .disabled(item.state != .on)
+            Button {
+                newName = item.title
+                renaming = true
+            } label: {
+                Label("Umbenennen", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                confirmRemove = true
+            } label: {
+                Label("Entfernen", systemImage: "trash")
+            }
+        }
+    }
 }
 
-// MARK: - Große Karte oben
+// MARK: - Kopf
 
-/// Wie die Karten im Hauptmenü: die Fläche leuchtet in der Farbe des Lichts,
-/// dazu Name, Zustand, Schalter und die Helligkeit zum Ziehen
-private struct ControlHero: View {
+/// Name und Zustand, rechts der Schalter
+private struct ControlHeader: View {
     let target: Target
     let item: Light?
 
     @Environment(LightController.self) private var light
-
-    static let height: CGFloat = 244
-
-    private var meta: String {
-        if let item {
-            if let badge = item.model.pixels.badge { return "\(item.name) · \(badge)" }
-            return item.name
-        }
-        let lights = light.lightsOf(.all)
-        if lights.isEmpty { return light.demo ? "Vorführmodus" : "Noch kein Licht" }
-        let on = lights.filter { $0.state == .on }.count
-        return "\(on)/\(lights.count) Lichter verbunden"
-    }
 
     private var stateText: String {
         let look = light.lookOf(target)
@@ -172,108 +182,138 @@ private struct ControlHero: View {
             return "Nicht verbunden"
         }
         if look.power == false { return "Aus" }
-        if let id = look.flowID, let flow = Flow.everything.first(where: { $0.id == id }) { return flow.name }
-        if look.builtin != nil { return "Eingebauter Effekt" }
+        if let id = look.flowID, let flow = Flow.everything.first(where: { $0.id == id }) { return "Effekt: \(flow.name)" }
+        if look.builtin != nil { return "Effekt in der Leiste" }
+        if light.goodnight != nil { return "Gute Nacht" }
         if light.sunrise != nil { return "Sonnenaufgang" }
-        return "Farbe \(light.glow(target).hex)"
+        return ColorName.of(look.base)
     }
 
-    /// Bei „Alle Lichter“ mit verschiedenen Farben bekommt jedes Licht ein Stück vom Verlauf
-    private var colors: [RGB] {
-        let look = light.lookOf(target)
-        let lights = light.lightsOf(target)
-        if target == .all && lights.count > 1 && look.flowID == nil && look.builtin == nil {
-            let each: [RGB] = lights.map { light.glow(.light($0.id)) }
-            let distinct: Set<String> = Set(each.map { $0.hex })
-            if distinct.count > 1 { return each }
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(light.title(target))
+                    .font(.geist(34, 800))
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text(stateText)
+                    .font(.geist(15, 500))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+                    .contentTransition(.interpolate)
+                    .animation(.snappy(duration: 0.2), value: stateText)
+            }
+            Spacer(minLength: 8)
+            PowerSwitch(target: target)
         }
-        return CardPalette.colors(look: look, glow: light.glow(target))
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
     }
+}
+
+/// Leuchten oben in der Farbe des Lichts
+private struct ControlGlow: View {
+    let target: Target
+
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        let live: Bool = light.isLive(target)
+        let c: Color = light.glow(target).color
+        RadialGradient(colors: [c.opacity(live ? 0.3 : 0), c.opacity(0)],
+                       center: UnitPoint(x: 0.5, y: 0.12), startRadius: 0, endRadius: 400)
+            .frame(height: 560)
+            .frame(maxWidth: .infinity)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.6), value: live)
+            .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Große Helligkeit
+
+/// Breite Leiste in der Farbe des Lichts: ziehen oder antippen stellt die Helligkeit ein
+private struct BrightnessBar: View {
+    let target: Target
+
+    @Environment(LightController.self) private var light
 
     var body: some View {
         let look = light.lookOf(target)
         let live: Bool = light.isLive(target)
-        let all: [RGB] = colors
-        let dark: Bool = CardPalette.darkText(all)
-        let ink: Color = live ? (dark ? Theme.ink : .white) : Theme.text
-        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
-        ZStack(alignment: .topLeading) {
-            if live {
-                CardSurface(colors: all, brightness: look.brightness, seed: 0)
-                    .transition(.opacity)
-            } else {
-                Theme.card
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(meta.uppercased())
-                        .font(.geistMono(11, 600))
-                        .tracking(1.6)
-                        .foregroundStyle(ink.opacity(0.7))
-                        .lineLimit(1)
-                    Text(light.title(target))
-                        .font(.geist(32, 800))
-                        .foregroundStyle(live ? ink : Theme.text.opacity(0.75))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
-                }
-                .padding(.trailing, 72)
-                Spacer(minLength: 0)
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
-                    Text(stateText)
-                        .font(.geist(15, 700))
-                        .foregroundStyle(live ? ink : Theme.muted)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                    if live {
-                        HeroPercent(value: look.brightness)
-                            .foregroundStyle(ink)
-                    } else if let item, item.state == .on || item.rssi != nil {
-                        SignalBars(rssi: item.rssi)
+        let glow: RGB = light.glow(target)
+        let value: Int = look.brightness
+        let ink: Color = CardPalette.darkText([glow]) ? Theme.ink : .white
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        GeometryReader { geo in
+            let fill: CGFloat = live ? max(60, geo.size.width * CGFloat(value) / 100) : 0
+            ZStack(alignment: .leading) {
+                Color(rgb: 0x1B1A15)
+                LinearGradient(colors: [glow.toward(.white, 0.3).color, glow.color], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: fill)
+                    .overlay(alignment: .trailing) {
+                        Capsule()
+                            .fill(ink.opacity(0.75))
+                            .frame(width: 5, height: 30)
+                            .padding(.trailing, 10)
                     }
-                }
-                // Platz für die Helligkeits-Leiste (liegt als eigene Fläche darüber)
-                Color.clear.frame(height: live ? 32 : 0)
+                BarLabels(live: live, value: value, ink: ink)
             }
-            .padding(20)
         }
-        .frame(height: Self.height)
+        .frame(height: 68)
         .clipShape(shape)
+        .overlay { shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1) }
+        .shadow(color: live ? glow.color.opacity(0.35) : .clear, radius: 18, y: 6)
         .overlay {
-            shape.strokeBorder(Color.white.opacity(live ? 0.14 : 0.08), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.55), radius: 20, y: 14)
-        .overlay(alignment: .topTrailing) {
-            PowerSwitch(target: target, onColor: live)
-                .padding(18)
-        }
-        .overlay(alignment: .bottom) {
             if live {
-                CardBrightness(value: look.brightness, color: ink) { light.setBrightness($0, for: target) }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 18)
+                DragStrip { f in
+                    let v = Int((f * 100).rounded())
+                    if v != value { light.setBrightness(v, for: target) }
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.35), value: live)
+        .animation(.easeOut(duration: 0.08), value: value)
+        .sensoryFeedback(.selection, trigger: value / 10)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Helligkeit")
+        .accessibilityValue(live ? "\(value) Prozent" : "Aus")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: light.setBrightness(min(value + 10, 100), for: target)
+            case .decrement: light.setBrightness(max(value - 10, 1), for: target)
+            @unknown default: break
+            }
+        }
     }
 }
 
-private struct HeroPercent: View {
+/// Beschriftung der Helligkeits-Leiste; die Schrift wird dunkel, wo die helle Füllung darunter liegt
+private struct BarLabels: View {
+    let live: Bool
     let value: Int
+    let ink: Color
 
     var body: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 1) {
-            Text("\(value)")
-                .font(.geistMono(40, 800))
+        let leftInk: Color = live && value >= 45 ? ink : Theme.text
+        let rightInk: Color = live && value >= 82 ? ink : Theme.text
+        HStack(spacing: 8) {
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 18, weight: .semibold))
+            Text("Helligkeit")
+                .font(.geist(17, 600))
+            Spacer(minLength: 8)
+            Text(live ? "\(value) %" : "Aus")
+                .font(.geistMono(20, 700))
+                .foregroundStyle(rightInk)
                 .contentTransition(.numericText(value: Double(value)))
-                .animation(.snappy(duration: 0.2), value: value)
-            Text("%")
-                .font(.geistMono(16, 700))
         }
+        .foregroundStyle(leftInk)
+        .padding(.horizontal, 18)
     }
 }
 
-/// Reiter Farbe · Effekte · Szenen als Pillen; die gelbe gleitet zum gewählten
+/// Reiter Farbe · Effekte; die gelbe Pille gleitet zum gewählten
 private struct SectionTabs: View {
     @Binding var selection: ControlSection
     @Namespace private var pill
@@ -295,22 +335,40 @@ private struct SectionTabs: View {
         return Button {
             withAnimation(.snappy(duration: 0.3)) { selection = s }
         } label: {
-            Text(s.title)
-                .font(.geist(15, on ? 700 : 600))
-                .foregroundStyle(on ? Theme.ink : Theme.muted)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background {
-                    if on {
-                        Capsule()
-                            .fill(Theme.accent)
-                            .shadow(color: Theme.accent.opacity(0.35), radius: 10)
-                            .matchedGeometryEffect(id: "pill", in: pill)
-                    }
+            HStack(spacing: 7) {
+                Image(systemName: s.symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(s.title)
+                    .font(.geist(15, on ? 700 : 600))
+            }
+            .foregroundStyle(on ? Theme.ink : Theme.muted)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background {
+                if on {
+                    Capsule()
+                        .fill(Theme.accent)
+                        .shadow(color: Theme.accent.opacity(0.35), radius: 10)
+                        .matchedGeometryEffect(id: "pill", in: pill)
                 }
-                .contentShape(Capsule())
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// Kleine Überschrift in Großbuchstaben
+private struct SmallLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.geistMono(11, 600))
+            .tracking(1.8)
+            .foregroundStyle(Theme.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
     }
 }
 
@@ -318,86 +376,68 @@ private struct SectionTabs: View {
 
 private struct ColorSection: View {
     @Environment(LightController.self) private var light
-    @State private var picking = false
 
-    private static let swatches: [RGB] = [
-        RGB(hex: 0xFF0000), RGB(hex: 0xFF7A00), RGB(hex: 0xFFD400), RGB(hex: 0x00FF40),
-        RGB(hex: 0x00E5FF), RGB(hex: 0x0040FF), RGB(hex: 0x8A2BE2), RGB(hex: 0xFF00C8),
-        RGB(hex: 0xFFFFFF), RGB(hex: 0xFF2A2A), RGB(hex: 0x00FFA2), RGB(hex: 0xFFB3D9),
-    ]
     private static let whiteColors: [Color] = [RGB(255, 147, 41), RGB(255, 214, 170), RGB(255, 255, 255), RGB(201, 226, 255)].map { $0.color }
-    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 6)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Farbe")
-                    .font(.geist(17, 700))
+            SmallLabel(text: "Zuletzt benutzt")
+                .padding(.bottom, 12)
+            RecentColors()
+
+            ColorWheel(color: light.base) { light.pick($0, instant: true) }
+                .frame(maxWidth: 280)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 26)
+
+            HStack {
+                Text("Weißton")
+                    .font(.geist(15, 700))
                     .foregroundStyle(Theme.text)
                 Spacer()
-                Text(light.base.hex)
-                    .font(.geistMono(15, 600))
+                Text("warm · kalt")
+                    .font(.geist(13, 500))
                     .foregroundStyle(Theme.muted)
             }
-            ColorWheel(color: light.base) { light.pick($0, instant: true) }
-                .frame(maxWidth: 290)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 22)
-
-            Text("Weißton")
-                .font(.geist(15, 700))
-                .foregroundStyle(Theme.text)
-                .padding(.bottom, 12)
+            .padding(.horizontal, 4)
+            .padding(.bottom, 12)
             ColorBar(colors: Self.whiteColors, position: light.bar == .white ? light.whitePos : nil, label: "Weißton") {
                 light.dragWhite($0)
             }
-
-            LazyVGrid(columns: Self.columns, spacing: 12) {
-                ForEach(0..<Self.swatches.count, id: \.self) { i in
-                    swatch(i)
-                }
-            }
-            .padding(.top, 22)
-
-            Button {
-                picking = true
-            } label: {
-                Text("Farbwähler von iOS")
-                    .font(.geist(14, 600))
-            }
-            .buttonStyle(CompactButtonStyle())
-            .padding(.top, 18)
-        }
-        .tile()
-        .sensoryFeedback(.selection, trigger: light.swatch)
-        .sheet(isPresented: $picking) {
-            SystemColorPicker(initial: light.base) { light.pick($0, instant: true) }
-                .ignoresSafeArea()
-                .presentationDetents([.medium, .large])
         }
     }
+}
 
-    /// Rundes Farbfeld; das gewählte leuchtet und bekommt einen gelben Ring
-    private func swatch(_ i: Int) -> some View {
-        let c = Self.swatches[i]
-        let on = light.swatch == i
-        let glow: Color = c.color.opacity(on ? 0.6 : 0)
-        return Button {
-            light.pick(c, swatch: i)
-        } label: {
-            Circle()
-                .fill(c.color)
-                .padding(4)
-                .overlay {
-                    Circle().strokeBorder(on ? Theme.accent : Color.clear, lineWidth: 2.5)
+/// Die letzten sechs Farben zum schnellen Antippen
+private struct RecentColors: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        let plain: Bool = light.flowID == nil && light.builtin == nil
+        let current: RGB = light.base
+        HStack(spacing: 12) {
+            ForEach(Array(light.recentColors.enumerated()), id: \.offset) { _, c in
+                let on: Bool = plain && LightController.similar(c, current)
+                Button {
+                    light.pick(c)
+                } label: {
+                    Circle()
+                        .fill(c.color)
+                        .overlay { Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1) }
+                        .padding(on ? 4 : 0)
+                        .overlay {
+                            Circle().strokeBorder(on ? Theme.accent : Color.clear, lineWidth: 2.5)
+                        }
+                        .aspectRatio(1, contentMode: .fit)
+                        .shadow(color: c.color.opacity(on ? 0.6 : 0), radius: 8)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.65), value: on)
                 }
-                .aspectRatio(1, contentMode: .fit)
-                .shadow(color: glow, radius: 8)
-                .scaleEffect(on ? 1.08 : 1)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: on)
+                .buttonStyle(PressStyle(scale: 0.88))
+                .accessibilityLabel("Farbe \(ColorName.of(c))")
+            }
         }
-        .buttonStyle(PressStyle(scale: 0.88))
-        .accessibilityLabel("Farbe \(c.hex)")
+        .frame(maxWidth: .infinity)
+        .sensoryFeedback(.selection, trigger: current.hex)
     }
 }
 
@@ -409,273 +449,225 @@ private struct EffectsSection: View {
     @Environment(LightController.self) private var light
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
+    private static let flows: [Flow] = [Flow.music] + Flow.all
 
     var body: some View {
         let lights = light.lightsOf(target)
-        let connected = lights.filter { $0.state == .on }
-        let addressable = connected.contains { $0.model.pixels == .addressable }
-        let singleOnly = !connected.isEmpty && connected.allSatisfy { $0.model.pixels == .singleColor }
-        VStack(spacing: 10) {
-            if addressable {
-                RunningLightPanel()
-            }
-            if target == .all && (lights.count > 1 || light.demo) {
-                WavePanel(count: max(lights.count, 2))
-            }
-            EffectCard(flow: Flow.music, wide: true, seed: 0)
+        let multi: Bool = target == .all && (lights.count > 1 || light.demo)
+        VStack(spacing: 12) {
             LazyVGrid(columns: Self.columns, spacing: 10) {
-                ForEach(Array(Flow.all.enumerated()), id: \.element.id) { index, flow in
-                    EffectCard(flow: flow, wide: false, seed: Double(index) * 1.3)
+                ForEach(Array(Self.flows.enumerated()), id: \.element.id) { index, flow in
+                    EffectTile(flow: flow, seed: Double(index) * 1.3)
                 }
             }
-            Hint(text: "Diese Effekte berechnet die App live. Sie laufen, solange die App offen ist – der Bildschirm bleibt dabei an. Nochmal antippen hält bei der aktuellen Farbe an.")
-                .padding(.top, 2)
-            LEDMeter(label: "Tempo", value: light.speed) { light.setSpeed($0) }
-                .padding(.top, 6)
-            SectionTitle("Im Licht eingebaut")
-            BuiltinTiles(target: target)
-            if singleOnly {
-                SingleColorNote(multiple: target == .all && lights.count > 1)
-                    .padding(.top, 6)
+            TempoRow(value: light.speed) { light.setSpeed($0) }
+                .padding(.top, 8)
+            if multi {
+                WaveRow()
             }
+            BuiltinGroup(target: target)
         }
         .sensoryFeedback(.selection, trigger: light.flowID)
     }
 }
 
-/// Effekt als bunte Kachel mit laufendem Farbverlauf; die laufende bekommt einen gelben Rand und „LÄUFT“
-private struct EffectCard: View {
+/// Symbol je Effekt
+enum FlowSymbol {
+    static func of(_ flow: Flow) -> String {
+        switch flow.id {
+        case "music": return "music.note"
+        case "rainbow": return "rainbow"
+        case "aurora": return "sparkles"
+        case "sunset": return "sun.horizon.fill"
+        case "ocean": return "water.waves"
+        case "lava": return "flame.fill"
+        case "neon": return "bolt.fill"
+        case "breathe": return "wind"
+        case "candle": return "flame"
+        default: return "sparkles"
+        }
+    }
+}
+
+/// Effekt als bunte Kachel mit laufendem Farbverlauf; der laufende bekommt einen gelben Rand
+private struct EffectTile: View {
     let flow: Flow
-    let wide: Bool
     let seed: Double
 
     @Environment(LightController.self) private var light
 
     var body: some View {
-        let on = light.flowID == flow.id
+        let on: Bool = light.flowID == flow.id
         let colors: [RGB] = CardPalette.flowColors(flow, base: light.base)
-        let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         Button {
             light.toggleFlow(flow)
         } label: {
             ZStack(alignment: .bottomLeading) {
                 CardSurface(colors: colors, brightness: 100, seed: seed)
-                LinearGradient(colors: [.black.opacity(0), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                VStack(alignment: .leading, spacing: 6) {
-                    if flow.kind == .music {
-                        Icon(kind: .music, size: 20, color: .white)
+                LinearGradient(colors: [.black.opacity(0), .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top) {
+                        Image(systemName: FlowSymbol.of(flow))
+                            .font(.system(size: 18, weight: .semibold))
+                        Spacer(minLength: 0)
+                        if on { LiveDot() }
                     }
+                    Spacer(minLength: 4)
                     Text(flow.name)
-                        .font(.geist(wide ? 24 : 17, 800))
-                        .foregroundStyle(.white)
+                        .font(.geist(15, 700))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    if wide {
-                        Text("Die Lichter folgen dem Takt – die App hört über das Mikrofon mit, nimmt aber nichts auf.")
-                            .font(.geist(12, 500))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
                 }
-                .padding(14)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+                .padding(12)
             }
-            .frame(height: wide ? 150 : 108)
+            .frame(height: 86)
             .clipShape(shape)
             .overlay {
-                shape.strokeBorder(on ? Theme.accent : Theme.edge, lineWidth: on ? 2 : 1)
+                shape.strokeBorder(on ? Theme.accent : Theme.edge, lineWidth: on ? 2.5 : 1)
             }
-            .overlay(alignment: .topTrailing) {
-                if on { LiveTag().padding(10) }
-            }
-            .shadow(color: .black.opacity(0.4), radius: 12, y: 8)
+            .shadow(color: on ? Theme.accent.opacity(0.35) : .black.opacity(0.3), radius: 12, y: 6)
+            .animation(.easeOut(duration: 0.2), value: on)
         }
-        .buttonStyle(PressStyle(scale: 0.97))
+        .buttonStyle(PressStyle(scale: 0.96))
         .accessibilityLabel(flow.name)
         .accessibilityValue(on ? "Läuft" : "")
     }
 }
 
-/// Welle über alle Lichter: die Farbe wandert von Licht zu Licht
-private struct WavePanel: View {
-    let count: Int
-
-    @Environment(LightController.self) private var light
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Toggle(isOn: Binding(get: { light.wave }, set: { light.setWave($0) })) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Welle über alle Lichter")
-                        .font(.geist(17, 700))
-                        .foregroundStyle(Theme.text)
-                    Text("Die Farbe wandert von Licht zu Licht")
-                        .font(.geist(12, 500))
-                        .foregroundStyle(Theme.muted)
-                }
-            }
-            .tint(Theme.accent)
-            // Vorschau: jedes Licht ein Abschnitt, die Farbe läuft versetzt durch
-            Clock { t in
-                Canvas { context, size in
-                    let dot: CGFloat = 6
-                    let gap: CGFloat = 4
-                    let n = max(Int((size.width + gap) / (dot + gap)), 1)
-                    let width = CGFloat(n) * dot + CGFloat(n - 1) * gap
-                    let x0 = (size.width - width) / 2 + dot / 2
-                    for i in 0..<n {
-                        let seg = min(i * count / n, count - 1)
-                        let shift = light.wave ? Double(seg) * 0.12 : 0
-                        var phase = (t / 6 - shift).truncatingRemainder(dividingBy: 1)
-                        if phase < 0 { phase += 1 }
-                        let color = ColorMath.hsv(phase * 360, 1, 1).color
-                        LED.draw(context, at: CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: size.height / 2), size: dot, color: color)
-                    }
-                }
-            }
-            .frame(height: 20)
-        }
-        .tile()
-    }
-}
-
-/// Nur bei Leisten mit einzeln steuerbaren LEDs: Lauflichter, die die Leiste entlangfahren
-private struct RunningLightPanel: View {
-    @Environment(LightController.self) private var light
-
-    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
+/// Tempo der Effekte: schmale Leiste mit Knopf
+private struct TempoRow: View {
+    let value: Int
+    let onChange: (Int) -> Void
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Text("Lauflicht")
-                    .font(.geist(17, 700))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Tempo")
+                    .font(.geist(15, 700))
                     .foregroundStyle(Theme.text)
-                PixelBadge(kind: .addressable)
-                Spacer(minLength: 0)
+                Spacer()
+                Text("\(value) %")
+                    .font(.geistMono(14, 600))
+                    .foregroundStyle(Theme.muted)
+                    .contentTransition(.numericText(value: Double(value)))
             }
-            Clock { t in
-                Canvas { context, size in
-                    let dot: CGFloat = 6
-                    let gap: CGFloat = 4
-                    let n = max(Int((size.width + gap) / (dot + gap)), 1)
-                    let width = CGFloat(n) * dot + CGFloat(n - 1) * gap
-                    let x0 = (size.width - width) / 2 + dot / 2
-                    let head = (t * 18).truncatingRemainder(dividingBy: Double(n + 8))
-                    for i in 0..<n {
-                        let d = head - Double(i)
-                        let color: Color? = d >= 0 && d < 8 ? ColorMath.hsv(Double(i) / Double(n) * 300, 1, 1 - d / 8).color : nil
-                        LED.draw(context, at: CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: size.height / 2), size: dot, color: color)
+            ThinSlider(value: value)
+                .overlay {
+                    DragStrip { f in
+                        let v = Int((f * 100).rounded())
+                        if v != value { onChange(v) }
                     }
                 }
-            }
-            .frame(height: 20)
-            Text("Die LEDs dieser Leiste sind einzeln steuerbar – die Effekte fahren die Leiste entlang. Das Tempo stellst du unten ein.")
-                .font(.geist(12, 400))
-                .foregroundStyle(Theme.muted)
-                .lineSpacing(2)
-            LazyVGrid(columns: Self.columns, spacing: 8) {
-                ForEach(EffectFamily.stripX.effects) { effect in
-                    Button(effect.name) {
-                        light.startBuiltin(effect.code, family: .stripX)
-                    }
-                    .buttonStyle(OutlineButtonStyle(on: light.builtin == effect.code && light.builtinFamily == .stripX))
-                }
-            }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.panel, in: shape)
-        .overlay {
-            shape.strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1.5)
+        .padding(.horizontal, 4)
+        .sensoryFeedback(.selection, trigger: value / 10)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Tempo")
+        .accessibilityValue("\(value) Prozent")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onChange(min(value + 10, 100))
+            case .decrement: onChange(max(value - 10, 0))
+            @unknown default: break
+            }
         }
     }
 }
 
-/// Bei normalen RGB-Leisten: kurz erklären, warum es dort kein Lauflicht gibt
-private struct SingleColorNote: View {
-    let multiple: Bool
-
-    @State private var open = false
+/// Schmale gelbe Leiste mit weißem Knopf
+private struct ThinSlider: View {
+    let value: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                withAnimation(.easeOut(duration: 0.25)) { open.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    PixelBadge(kind: .singleColor)
-                    Text("Lauflicht entlang der Leiste?")
-                        .font(.geist(14, 600))
-                        .foregroundStyle(Theme.text)
-                    Spacer(minLength: 0)
-                    Icon(kind: .chevron, size: 15, color: Theme.muted)
-                        .rotationEffect(.degrees(open ? 180 : 0))
-                }
-                .contentShape(Rectangle())
+        GeometryReader { geo in
+            let w: CGFloat = geo.size.width
+            let x: CGFloat = w * CGFloat(min(max(value, 0), 100)) / 100
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(height: 8)
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: max(8, x), height: 8)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 24, height: 24)
+                    .shadow(color: .black.opacity(0.5), radius: 5, y: 2)
+                    .offset(x: min(max(x - 12, 0), w - 24))
             }
-            .buttonStyle(.plain)
-            if open {
-                Text("Diese Leiste ist eine normale RGB-Leiste (Stecker mit 4 Kontakten: +, R, G, B). Alle LEDs bekommen dasselbe Signal und zeigen immer dieselbe Farbe – auch zwei Leisten am selben Verteiler. Für ein Lauflicht entlang der Leiste braucht es eine RGBIC-Leiste (3 Kontakte: +, Daten, −)."
-                     + (multiple ? " Mit mehreren Lichtern geht stattdessen die Welle: Die Farbe wandert von Licht zu Licht." : ""))
-                    .font(.geist(12, 400))
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 30)
+        .animation(.easeOut(duration: 0.08), value: value)
+    }
+}
+
+/// Welle über alle Lichter: die Farbe wandert von Licht zu Licht
+private struct WaveRow: View {
+    @Environment(LightController.self) private var light
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { light.wave }, set: { light.setWave($0) })) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Welle über alle Lichter")
+                    .font(.geist(15, 700))
+                    .foregroundStyle(Theme.text)
+                Text("Die Farbe wandert von Licht zu Licht")
+                    .font(.geist(13, 500))
                     .foregroundStyle(Theme.muted)
-                    .lineSpacing(2)
-                    .transition(.opacity)
             }
         }
+        .tint(Theme.accent)
         .tile()
     }
 }
 
-/// Eingebaute Effekte je Bauart der verbundenen Lichter (ELK und MELK haben verschiedene)
-private struct BuiltinTiles: View {
+/// Effekte, die im Licht selbst eingebaut sind – zugeklappt, damit die Seite ruhig bleibt
+private struct BuiltinGroup: View {
     let target: Target
 
     @Environment(LightController.self) private var light
-
-    var body: some View {
-        let lights = light.lightsOf(target).filter { $0.state == .on }
-        let families = EffectFamily.allCases.filter { family in family != .stripX && lights.contains { $0.model.family == family } }
-        VStack(spacing: 10) {
-            if !families.isEmpty || lights.isEmpty {
-                ForEach(families.isEmpty ? [EffectFamily.elk] : families, id: \.self) { family in
-                    BuiltinTile(family: family)
-                }
-            }
-            Hint(text: "Eingebaute Effekte laufen im Licht selbst weiter, auch wenn die App zu ist.")
-        }
-    }
-}
-
-private struct BuiltinTile: View {
-    let family: EffectFamily
-
-    @Environment(LightController.self) private var light
     @State private var open = false
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
 
+    private var families: [EffectFamily] {
+        let lights = light.lightsOf(target).filter { $0.state == .on }
+        var list: [EffectFamily] = []
+        if lights.contains(where: { $0.model.pixels == .addressable }) { list.append(.stripX) }
+        for family in EffectFamily.allCases where family != .stripX && lights.contains(where: { $0.model.family == family }) {
+            list.append(family)
+        }
+        return list.isEmpty ? [.elk] : list
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
+        let all = families
+        VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.snappy(duration: 0.25)) { open.toggle() }
             } label: {
-                HStack(spacing: 10) {
-                    Text(family.title)
-                        .font(.geist(16, 700))
-                        .foregroundStyle(Theme.text)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                HStack(spacing: 13) {
+                    Image(systemName: "cpu")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 34, height: 34)
+                        .background(Theme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Effekte in der Leiste")
+                            .font(.geist(15, 700))
+                            .foregroundStyle(Theme.text)
+                        Text("Laufen auch, wenn die App zu ist")
+                            .font(.geist(13, 500))
+                            .foregroundStyle(Theme.muted)
+                    }
                     Spacer(minLength: 8)
-                    Text("\(family.effects.count)")
-                        .font(.geistMono(12, 700))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.07), in: Capsule())
-                    Icon(kind: .chevron, size: 15, color: Theme.muted)
                         .rotationEffect(.degrees(open ? 180 : 0))
                 }
                 .contentShape(Rectangle())
@@ -683,99 +675,27 @@ private struct BuiltinTile: View {
             .buttonStyle(.plain)
 
             if open {
-                LazyVGrid(columns: Self.columns, spacing: 8) {
-                    ForEach(family.effects) { effect in
-                        Button(effect.name) {
-                            light.startBuiltin(effect.code, family: family)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(all, id: \.self) { family in
+                        if all.count > 1 {
+                            Text(family.title)
+                                .font(.geist(13, 600))
+                                .foregroundStyle(Theme.muted)
                         }
-                        .buttonStyle(OutlineButtonStyle(on: light.builtin == effect.code && light.builtinFamily == family))
+                        LazyVGrid(columns: Self.columns, spacing: 8) {
+                            ForEach(family.effects) { effect in
+                                Button(effect.name) {
+                                    light.startBuiltin(effect.code, family: family)
+                                }
+                                .buttonStyle(OutlineButtonStyle(on: light.builtin == effect.code && light.builtinFamily == family))
+                            }
+                        }
                     }
                 }
-                .padding(.top, 14)
+                .padding(.top, 16)
                 .transition(.opacity)
             }
         }
         .tile()
-    }
-}
-
-// MARK: - Szenen
-
-private struct ScenesSection: View {
-    @Environment(LightController.self) private var light
-    @State private var naming = false
-    @State private var name = ""
-    @State private var removing: LightScene?
-
-    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
-
-    var body: some View {
-        VStack(spacing: 10) {
-            LazyVGrid(columns: Self.columns, spacing: 10) {
-                ForEach(light.scenes) { scene in
-                    SceneCard(scene: scene, on: light.sceneID == scene.id) {
-                        light.apply(scene)
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            removing = scene
-                        } label: {
-                            Label("Szene löschen", systemImage: "trash")
-                        }
-                    }
-                }
-                SaveSceneTile {
-                    name = light.suggestedSceneName
-                    naming = true
-                }
-            }
-            Hint(text: "Eine Szene merkt sich Farbe oder Effekt, Helligkeit und Tempo – für das, was du gerade steuerst. Sie erscheint auch als Stimmung im Hauptmenü. Gedrückt halten löscht sie.")
-                .padding(.top, 4)
-        }
-        .sensoryFeedback(.selection, trigger: light.sceneID)
-        .alert("Szene speichern", isPresented: $naming) {
-            TextField("Name", text: $name)
-            Button("Speichern") { light.saveScene(named: name) }
-            Button("Abbrechen", role: .cancel) {}
-        } message: {
-            Text("Speichert Farbe oder Effekt, Helligkeit und Tempo.")
-        }
-        .confirmationDialog("Szene „\(removing?.name ?? "")“ löschen?", isPresented: Binding(
-            get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
-            Button("Löschen", role: .destructive) {
-                if let scene = removing { light.deleteScene(scene) }
-                removing = nil
-            }
-            Button("Abbrechen", role: .cancel) { removing = nil }
-        }
-    }
-}
-
-/// Gestrichelte Kachel: aktuelles Licht als Szene speichern
-private struct SaveSceneTile: View {
-    let action: () -> Void
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-        Button(action: action) {
-            VStack(spacing: 10) {
-                Icon(kind: .plus, size: 22, color: Theme.accent)
-                    .frame(width: 50, height: 50)
-                    .background(Theme.accent.opacity(0.1), in: Circle())
-                Text("Speichern")
-                    .font(.geist(16, 700))
-                    .foregroundStyle(Theme.text)
-                Text("AKTUELLES LICHT")
-                    .font(.geistMono(10, 600))
-                    .tracking(1.2)
-                    .foregroundStyle(Theme.muted)
-            }
-            .frame(maxWidth: .infinity, minHeight: SceneCard.height)
-            .background(Theme.panel.opacity(0.6), in: shape)
-            .overlay {
-                shape.strokeBorder(Color.white.opacity(0.25), style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-            }
-        }
-        .buttonStyle(PressStyle(scale: 0.97))
     }
 }

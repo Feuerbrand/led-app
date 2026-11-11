@@ -18,7 +18,8 @@ struct LEDControlApp: App {
                 .environment(light)
                 .environment(updater)
                 .onAppear {
-                    light.start()
+                    // Beim allerersten Start startet die Einführung Bluetooth (dort kommt die Abfrage)
+                    if Onboarding.mayStartBluetooth { light.start() }
                     updater.check()
                 }
                 .onOpenURL { url in

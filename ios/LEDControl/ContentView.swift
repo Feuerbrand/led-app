@@ -6,6 +6,8 @@ import UIKit
 enum Route: Hashable {
     case control(Target)
     case settings
+    /// Unterseiten der Einstellungen
+    case updates, shortcuts, manage, help
 }
 
 /// Welche Seiten gerade offen sind (damit Karten und Hinweise dorthin springen können)
@@ -14,6 +16,8 @@ final class Navigator {
     var path: [Route] = []
     /// Bereich, mit dem die nächste Steuerseite öffnet (z. B. „Szenen“ aus dem Hauptmenü)
     var section: ControlSection? = nil
+    /// Hauptmenü soll „Licht hinzufügen“ öffnen (z. B. am Ende der Einführung)
+    var addLight = false
 }
 
 /// Grundgerüst: Hauptmenü mit den Lichtern, von dort Steuerung und Einstellungen
@@ -22,6 +26,8 @@ struct ContentView: View {
     @Environment(Updater.self) private var updater
     @Environment(\.scenePhase) private var scenePhase
     @State private var nav = Navigator()
+    /// Einführung beim allerersten Start
+    @AppStorage("led-app.onboarded") private var onboarded = Onboarding.skipped
 
     /// Namen aller Lichter und Szenen (ändert sich einer, bekommt Siri die neue Liste)
     private var shortcutNames: [String] {
@@ -35,10 +41,21 @@ struct ContentView: View {
                     switch route {
                     case .control(let target): ControlView(target: target)
                     case .settings: SettingsView()
+                    case .updates: UpdatesPage()
+                    case .shortcuts: ShortcutsPage()
+                    case .manage: ManageLightsPage()
+                    case .help: HelpPage()
                     }
                 }
         }
         .tint(Theme.accent)
+        .fullScreenCover(isPresented: Binding(get: { !onboarded }, set: { if !$0 { onboarded = true } })) {
+            OnboardingView {
+                onboarded = true
+            }
+            .environment(light)
+            .environment(nav)
+        }
         .environment(nav)
         .preferredColorScheme(.dark)
         .sensoryFeedback(.success, trigger: light.connectedCount)
@@ -57,10 +74,11 @@ struct ContentView: View {
             LEDShortcuts.updateAppShortcutParameters()
         }
         .onAppear {
-            light.start()
+            // Beim ersten Start fragt erst die Einführung nach Bluetooth
+            if Onboarding.mayStartBluetooth { light.start() }
             // Für die automatischen App-Store-Bilder: Startseite per Startargument wählen
             switch UserDefaults.standard.string(forKey: "screenshotPage") {
-            case "color", "effects", "scenes": nav.path = [.control(.all)]
+            case "color", "effects": nav.path = [.control(.all)]
             case "light": nav.path = [.control(light.hub.mine.first.map { Target.light($0.id) } ?? .all)]
             case "settings": nav.path = [.settings]
             default: break
