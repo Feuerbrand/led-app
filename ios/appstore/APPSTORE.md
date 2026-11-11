@@ -25,19 +25,24 @@ Alles, was App Store Connect für die Veröffentlichung abfragt, in der Reihenfo
 
 **Werbetext (170)**
 ```
-Deine LED-Leiste, endlich richtig gesteuert: weiche Farbverläufe, Musik-Modus, Szenen und Siri – für mehrere Lichter gleichzeitig.
+Deine LED-Leiste, endlich richtig gesteuert: Farbe abfotografieren, Musik-Modus, Gute Nacht und ein Knopf im Kontrollzentrum.
 ```
 
 **Beschreibung (4000)**
 ```
 Steuere deine Bluetooth-LED-Leisten direkt vom iPhone – schnell, schön und ohne Umwege.
 
-LED Control verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü leuchtet jedes Licht als Karte in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
+LED Control verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü schimmert jedes Licht in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
+
+FARBE ABFOTOGRAFIEREN
+• Kamera auf etwas halten – auf ein Kissen, ein Poster, ein Getränk – und dein Licht leuchtet live in genau dieser Farbe
 
 LICHT
-• An/Aus und Helligkeit, für jedes Licht einzeln oder alle zusammen
-• Farbrad, Weißton-Leiste und 12 Farbfelder
+• An/Aus und große Helligkeits-Leiste, für jedes Licht einzeln oder alle zusammen
+• Farbrad, Weißton-Leiste und deine zuletzt benutzten Farben
 • Szenen speichern und mit einem Tippen abrufen
+• Gute Nacht: alle Lichter werden warm und dimmen in 10 Minuten bis aus
+• Aufwachen: ein Sonnenaufgang in 90 Sekunden
 
 EFFEKTE
 • Acht fließende Effekte: Regenbogen, Polarlicht, Sonnenuntergang, Ozean, Lava, Neon, Atmen und Kerzenschein – weich überblendet, ohne Sprünge
@@ -52,7 +57,9 @@ LICHTER
 • Blinken lassen, umbenennen, verbinden und trennen
 • Verbindet sich nach Abbrüchen von selbst neu
 
-SIRI UND KURZBEFEHLE
+KONTROLLZENTRUM, SPERRBILDSCHIRM UND SIRI
+• Knöpfe für das Kontrollzentrum und den Sperrbildschirm: an/aus und Gute Nacht
+• Widgets für den Home-Bildschirm
 • „Hey Siri, LED Control an“ und „… aus“
 • Szenen und Helligkeit in der Kurzbefehle-App – für Automationen und die Aktionstaste
 
@@ -65,7 +72,7 @@ Kein Konto, keine Werbung, kein Tracking. Die App erhebt keine Daten und braucht
 
 **Schlüsselwörter (100)**
 ```
-LED,Leiste,Lichtleiste,Strip,RGB,Bluetooth,Licht,Farbe,Effekte,Musik,Stimmung,Lampe,ELK,BLEDOM
+LED,Leiste,Lichtleiste,Strip,RGB,Bluetooth,Licht,Farbe,Kamera,Effekte,Musik,Lampe,ELK,BLEDOM,Widget
 ```
 
 **Support-URL**
@@ -89,11 +96,13 @@ https://github.com/Feuerbrand/led-app/blob/main/ios/SUPPORT.md
 ```
 LED Control controls Bluetooth LE LED strips and lamps (controllers that advertise as "ELK-BLEDOM" or "MELK", GATT service FFF0).
 
-No hardware? Every feature can be tried in demo mode: on the home screen tap "Ohne Licht ausprobieren" (try without a light), or open the settings (slider icon, top right) and switch on "Vorführmodus". Then tap "Alle Lichter" – all controls, effects and scenes work without a connected light.
+No hardware? Every feature can be tried in demo mode: on the home screen tap "Ohne Licht ausprobieren" (try without a light), or open the settings (gear icon, top right) → "Lichter verwalten" and switch on "Vorführmodus". Then tap "Alle steuern" – color, effects and scenes ("Farbe", "Effekte", "Szenen") work without a connected light. On first launch a short introduction is shown; it can be skipped ("Überspringen").
 
 Video of the app controlling a real LED strip: [LINK ZUM VIDEO]
 
-No account or login. The microphone is only used in the optional music mode ("Effekte" → "Musik") to measure loudness; nothing is recorded, stored or transmitted. The app makes no network connections.
+No account or login. The microphone is only used in the optional music mode ("Effekte" → "Musik") to measure loudness; nothing is recorded, stored or transmitted. The camera is only used in the optional "Farbe abfotografieren" feature ("Farbe" tab): the app reads the average color in the center of the live image to set the light; no photo or video is taken, stored or transmitted. The app makes no network connections.
+
+Control Center / Lock Screen controls and widgets open the app briefly to send the command over Bluetooth.
 
 Siri: "LED Control an" / "LED Control aus".
 ```

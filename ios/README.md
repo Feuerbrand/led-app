@@ -114,7 +114,7 @@ Ab dann kommt jede Änderung an der App von selbst aufs iPhone. GitHub pausiert 
 
 Läuft TestFlight (Weg 3), kann dieselbe App in den App Store – ohne Zusatzkosten, solange sie kostenlos ist. Vorbereitet ist schon:
 
-- **Vorführmodus:** Apple hat keine Leiste zum Testen. Im Hauptmenü gibt es deshalb **„Ohne Licht ausprobieren“**, in den **Einstellungen** den Schalter **Vorführmodus**.
+- **Vorführmodus:** Apple hat keine Leiste zum Testen. Im Hauptmenü gibt es deshalb **„Ohne Licht ausprobieren“**, in den **Einstellungen → Lichter verwalten** den Schalter **Vorführmodus**.
 - **App-Store-Version:** Kommt die App aus dem App Store oder TestFlight, blendet sie alles zu AltStore, GitHub-Downloads und der eigenen Update-Prüfung aus und stellt keine Internetverbindung her.
 - **Bildschirmfotos:** Jeder Build nimmt im Simulator vier Bilder im größten iPhone-Format auf (Artifact **app-store-bilder** im Lauf auf GitHub).
 - **Texte:** [appstore/APPSTORE.md](appstore/APPSTORE.md) – Untertitel, Beschreibung, Schlüsselwörter, Hinweise für die Prüfer, Antworten zu Datenschutz und Altersfreigabe.

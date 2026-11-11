@@ -23,9 +23,11 @@ Nur wenn du den Musik-Modus einschaltest, nutzt die App das Mikrofon. Sie misst 
 
 ## Auf dem Gerät gespeicherte Daten
 
-Die App speichert auf deinem iPhone: deine Lichter (Name, Kennung, eigener Name), Szenen, die zuletzt gewählte Farbe, Helligkeit und Tempo sowie ein Protokoll der letzten Verbindungsmeldungen. Diese Daten verlassen das Gerät nicht und werden gelöscht, wenn du die App löschst.
+Die App speichert auf deinem iPhone: deine Lichter (Name, Kennung, eigener Name), Szenen, die zuletzt benutzten Farben, Helligkeit und Tempo sowie ein Protokoll der letzten Verbindungsmeldungen. Diese Daten verlassen das Gerät nicht und werden gelöscht, wenn du die App löschst.
 
 ## Siri und Kurzbefehle
+
+Für „Farbe abfotografieren“ nutzt die App die Kamera, aber nur, solange diese Ansicht offen ist. Sie misst dabei nur die Farbe in der Bildmitte; es werden keine Fotos oder Videos aufgenommen, gespeichert oder übertragen.
 
 Wenn du Siri oder die Kurzbefehle-App mit LED Control verwendest, verarbeitet Apple die Sprachbefehle nach seinen eigenen Datenschutzbestimmungen. Die App selbst erhält nur den jeweiligen Befehl (z. B. „Licht an“).
 
@@ -33,7 +35,7 @@ Wenn du Siri oder die Kurzbefehle-App mit LED Control verwendest, verarbeitet Ap
 
 Die Version aus dem App Store und aus TestFlight stellt **keine Internetverbindung** her.
 
-Nur bei einer selbst installierten Version (z. B. über AltStore oder Sideloadly) fragt die App beim Öffnen bei GitHub (`api.github.com`) nach, ob es eine neuere Version gibt. Dabei erhält GitHub, wie bei jedem Webseitenaufruf, deine IP-Adresse; es gilt die [Datenschutzerklärung von GitHub](https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement). Diese Abfrage lässt sich in der App unter *Mehr → Updates* abschalten.
+Nur bei einer selbst installierten Version (z. B. über AltStore oder Sideloadly) fragt die App beim Öffnen bei GitHub (`api.github.com`) nach, ob es eine neuere Version gibt. Dabei erhält GitHub, wie bei jedem Webseitenaufruf, deine IP-Adresse; es gilt die [Datenschutzerklärung von GitHub](https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement). Diese Abfrage lässt sich in der App unter *Einstellungen → Updates* abschalten.
 
 ## Deine Rechte
 
