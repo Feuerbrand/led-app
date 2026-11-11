@@ -6,9 +6,10 @@ Die Webseite aus diesem Repository als echte iPhone-App – ohne Bluefy, mit meh
 - **Schnell:** **Timer** (alle Lichter gehen nach 15–90 min aus), **Musik** mit einem Tippen, **Würfeln** (jedes Licht bekommt eine neue Farbe) und **Aufwachen**, ein 90-Sekunden-Sonnenaufgang von Dunkelrot bis Warmweiß.
 - **Mehrere Lichter:** die ELK-BLEDOM-Leiste und Lichter, die sonst nur **Lotus Lamp X** steuert (MELK-Geräte). Jedes Licht hat seine eigene Farbe, Helligkeit und seinen eigenen Effekt.
 - **Hinzufügen mit Namen:** **+** zeigt nur passende LED-Lichter in der Nähe; beim Hinzufügen vergibst du gleich einen eigenen Namen (z. B. „Wohnzimmer“).
-- **Farbe:** Farbrad zum Ziehen, Weißton-Leiste, 12 Farbfelder, Helligkeit.
-- **Effekte:** die acht Flow-Effekte der Webseite, **Musik-Modus** (Lichter pulsieren im Takt), Tempo, die eingebauten Effekte jedes Lichts und bei „Alle Lichter“ die **Welle**: die Farbe wandert von Licht zu Licht.
-- **Szenen** zum Speichern und Antippen.
+- **Steuerung:** oben eine große Karte im Farbverlauf des Lichts mit Schalter und Helligkeit zum Ziehen, darunter die Reiter **Farbe**, **Effekte** und **Szenen**.
+- **Farbe:** Farbrad zum Ziehen, Weißton-Leiste, 12 Farbfelder.
+- **Effekte:** die acht Flow-Effekte der Webseite als bunte Kacheln, **Musik-Modus** (Lichter pulsieren im Takt), Tempo, die eingebauten Effekte jedes Lichts und bei „Alle Lichter“ die **Welle**: die Farbe wandert von Licht zu Licht.
+- **Szenen** als kleine Poster zum Speichern und Antippen; sie erscheinen auch als Stimmungen im Hauptmenü.
 - **Siri und Kurzbefehle:** „Hey Siri, LED Control an“, „Schalte Wohnzimmer mit LED Control an“, Szenen per Name, Automationen, Aktionstaste – ohne Einrichtung.
 - **Erkennt, was ein Licht kann:** Leisten mit einzeln steuerbaren LEDs (**RGBIC**) bekommen Lauflichter, die die Leiste entlangfahren; normale **RGB**-Leisten zeigen immer eine Farbe.
 - **Updates:** Die App meldet neue Versionen; mit AltStore aktualisiert sie sich mit einem Tippen.
@@ -208,6 +209,7 @@ Diese Punkte konnten ohne iPhone und Lichter nicht ausprobiert werden:
 - [ ] **Flow-Effekte:** alle acht laufen flüssig, Wechsel ohne Sprung, **Tempo** wirkt, nochmal Antippen hält an.
 - [ ] **Musik-Modus:** fragt nach dem Mikrofon, die Leiste pulsiert mit der Musik.
 - [ ] **Szenen:** antippen, speichern, lange drücken zum Löschen.
+- [ ] **Steuerung:** die große Karte oben leuchtet in der Farbe des Lichts; Schalter und Helligkeits-Leiste auf der Karte wirken, die Reiter wechseln.
 - [ ] **MELK-Licht** (Lotus Lamp X vorher schließen): über **+** hinzufügen und benennen, es verbindet sich (nach rund 2 s), An/Aus, Helligkeit, Farbe und seine eigenen eingebauten Effekte wirken.
 - [ ] **Einzeln und gemeinsam:** Karte antippen steuert nur dieses Licht, **Alle Lichter** steuert beide; die **Welle** lässt einen Effekt von Licht zu Licht wandern.
 - [ ] **Karten:** leuchten in der Farbe des Lichts, Ein/Aus-Knopf, gedrückt halten → Blinken lassen, Umbenennen, Entfernen. Im Stapel holt Antippen eine Karte nach vorne; die Leiste auf der vorderen Karte ändert die Helligkeit.

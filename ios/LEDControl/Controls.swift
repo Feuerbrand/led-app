@@ -23,15 +23,15 @@ struct Clock<Content: View>: View {
 
 // MARK: - Kacheln und Überschriften
 
-/// Paneel: flache Fläche mit Haarlinie, kantige Ecken
+/// Kachel: dunkle Fläche mit runden Ecken und leisem Rand (wie die Karten im Hauptmenü)
 struct Tile: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(16)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1)
             }
     }
 }
@@ -80,53 +80,18 @@ struct SectionTitle: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Rectangle()
-                .fill(Theme.accent)
-                .frame(width: 6, height: 6)
-            Text(text.uppercased())
-                .font(.geistMono(11, 600))
-                .tracking(1.8)
-                .foregroundStyle(Theme.muted)
-            Rectangle()
-                .fill(Theme.hair)
-                .frame(height: 1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(EdgeInsets(top: 26, leading: 2, bottom: 12, trailing: 0))
-    }
-}
-
-/// Kopfzeile einer Kachel: Symbol, Titel, rechts der aktuelle Wert
-struct TileHeader: View {
-    let icon: IconKind
-    let title: String
-    let value: String
-    /// Nur bei der Helligkeit: das Symbol dreht und wächst mit dem Wert (0…100)
-    var level: Double? = nil
-
-    var body: some View {
-        let turn: Double = (level ?? 0) * 1.8
-        let grow: Double = level == nil ? 1 : 0.75 + (level ?? 0) / 100 * 0.45
-        HStack(spacing: 10) {
-            Icon(kind: icon, size: 17, color: Theme.accent)
-                .rotationEffect(.degrees(turn))
-                .scaleEffect(CGFloat(grow))
-            Text(title)
-                .font(.geist(16, 500))
-                .foregroundStyle(Theme.text)
-            Spacer(minLength: 8)
-            Text(value)
-                .font(.geist(18, 600))
-                .monospacedDigit()
-                .foregroundStyle(Theme.text)
-        }
+        Text(text.uppercased())
+            .font(.geistMono(11, 600))
+            .tracking(1.8)
+            .foregroundStyle(Theme.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(EdgeInsets(top: 28, leading: 4, bottom: 12, trailing: 0))
     }
 }
 
 // MARK: - Knöpfe
 
-/// Knopf mit hellem Rahmen wie `.ob`: gedrückt oder aktiv wird er gelb umrandet
+/// Runder Knopf auf dunkler Fläche; aktiv wird er gelb gefüllt
 struct OutlineButtonStyle: ButtonStyle {
     var on = false
 
@@ -142,25 +107,32 @@ struct OutlineButtonStyle: ButtonStyle {
         @Environment(\.isEnabled) private var enabled
 
         var body: some View {
-            let hot = on || pressed
+            let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
             label
-                .font(.geist(15, 500))
-                .foregroundStyle(Theme.text)
+                .font(.geist(15, 600))
+                .foregroundStyle(on ? Theme.ink : Theme.text)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
-                .environment(\.iconTint, hot ? Theme.accent : Theme.icon)
-                .padding(.horizontal, 12)
+                .environment(\.iconTint, on ? Theme.ink : Theme.accent)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, minHeight: 46)
-                .background(hot ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 4))
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Self.fill(on: on, pressed: pressed), in: shape)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(hot ? Theme.accent : Theme.line.opacity(0.55), lineWidth: 1)
+                    shape.strokeBorder(Color.white.opacity(on ? 0 : 0.12), lineWidth: 1.5)
                 }
+                .shadow(color: Theme.accent.opacity(on ? 0.3 : 0), radius: 12)
                 .contentShape(Rectangle())
                 .scaleEffect(pressed ? 0.96 : 1)
                 .opacity(enabled ? 1 : 0.35)
-                .animation(.easeOut(duration: 0.15), value: hot)
+                .animation(.easeOut(duration: 0.15), value: on)
+                .animation(.easeOut(duration: 0.12), value: pressed)
+        }
+
+        private static func fill(on: Bool, pressed: Bool) -> Color {
+            if on { return Theme.accent }
+            return Color.white.opacity(pressed ? 0.12 : 0.05)
         }
     }
 }
@@ -295,12 +267,12 @@ struct ColorBar: View {
     let onDrag: (Double) -> Void
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 5)
+        Capsule()
             .fill(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
             .overlay {
-                RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.line, lineWidth: Theme.border)
+                Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
             }
-            .frame(height: 34)
+            .frame(height: 38)
             .overlay {
                 GeometryReader { geo in
                     knob
@@ -318,15 +290,15 @@ struct ColorBar: View {
     }
 
     private var knob: some View {
-        RoundedRectangle(cornerRadius: 6)
+        Circle()
             .fill(Theme.text)
             .overlay {
-                RoundedRectangle(cornerRadius: 6).strokeBorder(Color(rgb: 0x14130E), lineWidth: 2)
+                Circle().strokeBorder(Theme.ink, lineWidth: 2)
             }
-            .frame(width: 12, height: 46)
-            .padding(1.5)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 7.5))
-            .shadow(color: .black.opacity(0.7), radius: 5, y: 2)
+            .frame(width: 30, height: 30)
+            .padding(3)
+            .background(Theme.accent, in: Circle())
+            .shadow(color: .black.opacity(0.6), radius: 6, y: 2)
     }
 }
 

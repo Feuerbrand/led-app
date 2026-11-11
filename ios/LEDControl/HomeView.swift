@@ -23,10 +23,10 @@ struct HomeView: View {
             if !filled {
                 EmptyHome(adding: $adding).rise(2)
             } else {
-                HomeLabel("Stimmungen · wischen").rise(2)
+                SectionTitle("Stimmungen · wischen").rise(2)
                 MoodRail().rise(2)
 
-                HomeLabel(mine.count == 1 ? "Mein Licht" : "Meine Lichter").rise(3)
+                SectionTitle(mine.count == 1 ? "Mein Licht" : "Meine Lichter").rise(3)
                 if mine.isEmpty {
                     LightCard(target: .all, item: nil, expanded: true, seed: 0) {
                         nav.path.append(.control(.all))
@@ -39,7 +39,7 @@ struct HomeView: View {
                     .padding(.top, 12)
                     .rise(5)
 
-                HomeLabel("Schnell").rise(5)
+                SectionTitle("Schnell").rise(5)
                 QuickRow().rise(6)
 
                 Hint(text: mine.count > 1
@@ -145,23 +145,6 @@ struct RoundIconButton: View {
     }
 }
 
-private struct HomeLabel: View {
-    private let text: String
-
-    init(_ text: String) {
-        self.text = text
-    }
-
-    var body: some View {
-        Text(text.uppercased())
-            .font(.geistMono(11, 600))
-            .tracking(1.8)
-            .foregroundStyle(Theme.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(EdgeInsets(top: 28, leading: 4, bottom: 12, trailing: 0))
-    }
-}
-
 // MARK: - Stimmungen
 
 private struct MoodItem: Identifiable {
@@ -194,16 +177,6 @@ private struct MoodRail: View {
         let look = light.lookOf(.all)
         if let id = scene.flowID { return look.flowID == id }
         return look.flowID == nil && look.builtin == nil && look.base == scene.color
-    }
-
-    private static func subtitle(_ scene: LightScene) -> String {
-        let what: String
-        if let id = scene.flowID, let flow = Flow.everything.first(where: { $0.id == id }) {
-            what = flow.name
-        } else {
-            what = scene.color.hex
-        }
-        return "\(what) · \(scene.brightness) %"
     }
 
     var body: some View {
@@ -251,7 +224,7 @@ private struct MoodRail: View {
     private func poster(_ item: MoodItem) -> some View {
         switch item.kind {
         case .scene(let scene):
-            MoodPoster(art: MoodArt.style(for: scene), title: scene.name, subtitle: Self.subtitle(scene),
+            MoodPoster(art: MoodArt.style(for: scene), title: scene.name, subtitle: scene.summary,
                        active: isActive(scene)) {
                 light.apply(scene, to: .all)
             }
@@ -329,18 +302,24 @@ private struct LightStack: View {
 enum CardPalette {
     static func colors(look: LightLook, glow: RGB) -> [RGB] {
         if let id = look.flowID, let flow = Flow.everything.first(where: { $0.id == id }) {
-            switch flow.kind {
-            case .rainbow, .palette: return flow.previewStops
-            case .music: return Flow.all[0].previewStops
-            case .candle: return [RGB(255, 176, 70), RGB(255, 118, 28), RGB(232, 74, 12)]
-            case .breathe: return shades(look.base)
-            }
+            return flowColors(flow, base: look.base)
         }
-        if look.builtin != nil {
-            return [RGB(255, 45, 106), RGB(255, 138, 0), RGB(47, 212, 255), RGB(193, 60, 255)]
-        }
+        if look.builtin != nil { return builtin }
         return shades(glow)
     }
+
+    /// Farben eines Effekts (für Karten und Effekt-Kacheln)
+    static func flowColors(_ flow: Flow, base: RGB) -> [RGB] {
+        switch flow.kind {
+        case .rainbow, .palette: return flow.previewStops
+        case .music: return Flow.all[0].previewStops
+        case .candle: return [RGB(255, 176, 70), RGB(255, 118, 28), RGB(232, 74, 12)]
+        case .breathe: return shades(base)
+        }
+    }
+
+    /// Eingebaute Effekte: bunte Mischung
+    static let builtin: [RGB] = [RGB(255, 45, 106), RGB(255, 138, 0), RGB(47, 212, 255), RGB(193, 60, 255)]
 
     static func shades(_ c: RGB) -> [RGB] {
         [c.toward(.white, 0.4), c, c.scaled(0.8), c.toward(.white, 0.18)]
@@ -460,7 +439,7 @@ private struct LightCard: View {
         }
         .buttonStyle(PressStyle(scale: 0.985))
         .overlay(alignment: .topTrailing) {
-            CardSwitch(target: target, onColor: live)
+            PowerSwitch(target: target, onColor: live)
                 .padding(18)
         }
         .overlay(alignment: .bottom) {
@@ -477,7 +456,7 @@ private struct LightCard: View {
 }
 
 /// Laufende Fläche einer Karte: wandernder Farbverlauf, Lichtreflex, feine Linien
-private struct CardSurface: View {
+struct CardSurface: View {
     let colors: [RGB]
     let brightness: Int
     let seed: Double
@@ -545,41 +524,8 @@ private struct Grain: View {
     }
 }
 
-/// Schalter auf der Karte: dunkle Kapsel, gelber leuchtender Knopf
-private struct CardSwitch: View {
-    let target: Target
-    let onColor: Bool
-
-    @Environment(LightController.self) private var light
-
-    var body: some View {
-        let usable = light.demo || light.isConnected(target)
-        let on = usable && light.lookOf(target).power != false
-        Button {
-            light.setPower(!on, for: target)
-        } label: {
-            ZStack(alignment: on ? .trailing : .leading) {
-                Capsule()
-                    .fill(onColor ? Color(rgb: 0x14130E, opacity: 0.85) : Color(rgb: 0x2A2822))
-                Circle()
-                    .fill(on ? Theme.accent : Color(rgb: 0x8A8678))
-                    .frame(width: 26, height: 26)
-                    .shadow(color: on ? Theme.accent.opacity(0.85) : .clear, radius: 8)
-                    .padding(4)
-            }
-            .frame(width: 58, height: 34)
-            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: on)
-        }
-        .buttonStyle(PressStyle(scale: 0.92))
-        .disabled(!usable)
-        .opacity(usable ? 1 : 0.4)
-        .sensoryFeedback(.impact(weight: .medium), trigger: on)
-        .accessibilityLabel(on ? "Ausschalten" : "Einschalten")
-    }
-}
-
 /// Helligkeit direkt auf der Karte: über die Leiste ziehen oder tippen
-private struct CardBrightness: View {
+struct CardBrightness: View {
     let value: Int
     let color: Color
     let onChange: (Int) -> Void

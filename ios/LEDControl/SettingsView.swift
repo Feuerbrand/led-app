@@ -301,11 +301,11 @@ private struct ShortcutsTile: View {
                                 .foregroundStyle(copied == link ? Theme.accent : Theme.muted)
                                 .lineLimit(1)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 5))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.soft, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1)
                         }
                     }
                     .buttonStyle(PressStyle(scale: 0.98))

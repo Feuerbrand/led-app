@@ -47,7 +47,7 @@ struct ColorWheel: View {
                     .frame(width: size, height: size)
                     .position(x: cx, y: cy)
                 Circle()
-                    .strokeBorder(Theme.line, lineWidth: Theme.border)
+                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
                     .frame(width: size, height: size)
                     .position(x: cx, y: cy)
                 // Knopf an der gewählten Farbe

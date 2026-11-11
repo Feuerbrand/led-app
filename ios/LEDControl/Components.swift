@@ -30,18 +30,21 @@ struct PageTitle: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.geist(32, 700))
-                .foregroundStyle(Theme.text)
+        VStack(alignment: .leading, spacing: 8) {
             Text(subtitle.uppercased())
-                .font(.geistMono(11, 500))
-                .tracking(1.2)
+                .font(.geistMono(11, 600))
+                .tracking(1.8)
                 .foregroundStyle(Theme.muted)
+                .lineLimit(2)
+            Text(title)
+                .font(.geist(36, 800))
+                .foregroundStyle(Theme.text)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 4)
         .rise(0)
     }
 }
@@ -158,53 +161,6 @@ struct LEDPanel: View {
     }
 }
 
-/// Laufende Vorschau eines Effekts als LED-Reihe – so, wie er auf einer Leiste aussieht
-struct EffectLEDs: View {
-    let flow: Flow
-    let base: RGB
-    let active: Bool
-    var dot: CGFloat = 6
-    var gap: CGFloat = 4
-
-    var body: some View {
-        Clock { t in
-            Canvas { context, size in
-                let n = max(Int((size.width + gap) / (dot + gap)), 1)
-                let width = CGFloat(n) * dot + CGFloat(n - 1) * gap
-                let x0 = (size.width - width) / 2 + dot / 2
-                for i in 0..<n {
-                    let c = Self.color(flow, base: base, i: i, n: n, t: t, fast: active)
-                    LED.draw(context, at: CGPoint(x: x0 + CGFloat(i) * (dot + gap), y: size.height / 2), size: dot, color: c)
-                }
-            }
-        }
-        .frame(height: dot * 3.4)
-        .accessibilityHidden(true)
-    }
-
-    static func color(_ flow: Flow, base: RGB, i: Int, n: Int, t: Double, fast: Bool) -> Color? {
-        let period = fast ? 4.0 : 9.0
-        let x = Double(i) / Double(max(n - 1, 1))
-        switch flow.kind {
-        case .music:
-            // Pegelanzeige: von links leuchten so viele LEDs, wie es gerade laut ist
-            let level = 0.3 + 0.35 * abs(sin(t * (fast ? 3.4 : 1.9))) + 0.3 * abs(sin(t * (fast ? 7.1 : 3.3) + 1))
-            if x > level { return nil }
-            return ColorMath.hsv(x * 300, 1, 1).color
-        case .breathe:
-            let phase = (t / (period * 0.8)).truncatingRemainder(dividingBy: 1)
-            return flow.color(at: phase, base: base).color
-        case .candle:
-            let phase = (t / (period * 3) + x * 0.07).truncatingRemainder(dividingBy: 1)
-            return flow.color(at: phase, base: base).color
-        case .rainbow, .palette:
-            var phase = (t / period - x * 0.55).truncatingRemainder(dividingBy: 1)
-            if phase < 0 { phase += 1 }
-            return flow.color(at: phase, base: base).color
-        }
-    }
-}
-
 /// Lauflicht hin und her (beim Suchen von Lichtern)
 struct ScannerLEDs: View {
     var dot: CGFloat = 7
@@ -299,13 +255,13 @@ struct PixelBadge: View {
                 .font(.geistMono(10, 700))
                 .tracking(1)
                 .foregroundStyle(addressable ? Theme.ink : Theme.muted)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
                 .background {
                     if addressable {
-                        Rectangle().fill(Theme.accent)
+                        Capsule().fill(Theme.accent)
                     } else {
-                        Rectangle().strokeBorder(Theme.hair, lineWidth: 1)
+                        Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
                     }
                 }
                 .accessibilityLabel(addressable ? "Einzeln steuerbare LEDs" : "Eine Farbe für die ganze Leiste")
@@ -347,9 +303,11 @@ struct BluetoothProblem: View {
 
 // MARK: - Bedienelemente
 
-/// Kippschalter wie an einem Gerät: gelb = an
+/// Schalter wie auf den Karten im Hauptmenü: dunkle Kapsel, gelber leuchtender Knopf.
+/// `onColor`: der Schalter liegt auf einer farbigen Karte.
 struct PowerSwitch: View {
     let target: Target
+    var onColor: Bool = false
 
     @Environment(LightController.self) private var light
 
@@ -361,67 +319,56 @@ struct PowerSwitch: View {
         } label: {
             ZStack(alignment: on ? .trailing : .leading) {
                 Capsule()
-                    .fill(on ? Theme.accent : Theme.ledOff)
+                    .fill(onColor ? Color(rgb: 0x14130E, opacity: 0.85) : Color(rgb: 0x2A2822))
                 Circle()
-                    .fill(on ? Theme.ink : Theme.text.opacity(0.85))
-                    .frame(width: 22, height: 22)
+                    .fill(on ? Theme.accent : Color(rgb: 0x8A8678))
+                    .frame(width: 26, height: 26)
+                    .shadow(color: on ? Theme.accent.opacity(0.85) : .clear, radius: 8)
                     .padding(4)
             }
-            .frame(width: 54, height: 30)
+            .frame(width: 58, height: 34)
             .animation(.spring(response: 0.28, dampingFraction: 0.72), value: on)
         }
-        .buttonStyle(PressStyle(scale: 0.94))
+        .buttonStyle(PressStyle(scale: 0.92))
         .disabled(!usable)
-        .opacity(usable ? 1 : 0.35)
+        .opacity(usable ? 1 : 0.4)
         .sensoryFeedback(.impact(weight: .medium), trigger: on)
         .accessibilityLabel(on ? "Ausschalten" : "Einschalten")
     }
 }
 
-/// Pegel aus Segmenten (Helligkeit, Tempo) mit großer Zahl; ziehen oder antippen zum Einstellen
+/// Großer Regler 0…100 (Helligkeit, Tempo): gelbe Füllung mit Griff, große Zahl; ziehen oder antippen
 struct LEDMeter: View {
     let label: String
     let value: Int
     let onChange: (Int) -> Void
 
-    private static let segments = 24
-
     var body: some View {
-        let lit = Int((Double(value) / 100 * Double(Self.segments)).rounded())
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(label.uppercased())
-                    .font(.geistMono(11, 600))
-                    .tracking(1.6)
-                    .foregroundStyle(Theme.muted)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(label)
+                    .font(.geist(17, 700))
+                    .foregroundStyle(Theme.text)
                 Spacer(minLength: 8)
                 Text("\(value)")
-                    .font(.geistMono(34, 600))
+                    .font(.geistMono(30, 800))
                     .foregroundStyle(Theme.text)
                     .contentTransition(.numericText(value: Double(value)))
                     .animation(.snappy(duration: 0.2), value: value)
                 Text("%")
-                    .font(.geistMono(14, 500))
+                    .font(.geistMono(14, 700))
                     .foregroundStyle(Theme.muted)
             }
-            HStack(spacing: 3) {
-                ForEach(0..<Self.segments, id: \.self) { i in
-                    Rectangle()
-                        .fill(i < lit ? Theme.accent : Theme.ledOff)
-                        .shadow(color: Theme.accent.opacity(i < lit ? 0.55 : 0), radius: 3)
+            MeterBar(value: value)
+                .overlay {
+                    DragStrip { f in
+                        let v = Int((f * 100).rounded())
+                        if v != value { onChange(v) }
+                    }
                 }
-            }
-            .frame(height: 26)
-            .animation(.easeOut(duration: 0.08), value: lit)
-            .overlay {
-                DragStrip { f in
-                    let v = Int((f * 100).rounded())
-                    if v != value { onChange(v) }
-                }
-            }
         }
         .tile()
-        .sensoryFeedback(.selection, trigger: lit)
+        .sensoryFeedback(.selection, trigger: value / 5)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue("\(value) Prozent")
@@ -435,17 +382,50 @@ struct LEDMeter: View {
     }
 }
 
-/// Kleiner Knopf mit gelbem Rahmen (Hinzufügen, Prüfen …)
+/// Die Leiste des Reglers
+private struct MeterBar: View {
+    let value: Int
+
+    private static let height: CGFloat = 46
+
+    var body: some View {
+        GeometryReader { geo in
+            let fill: CGFloat = Self.fill(value, geo.size.width)
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(LinearGradient(colors: [Theme.accent.opacity(0.7), Theme.accent], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: fill)
+                    .shadow(color: Theme.accent.opacity(0.35), radius: 10)
+                Capsule()
+                    .fill(Theme.ink.opacity(0.5))
+                    .frame(width: 4, height: 20)
+                    .offset(x: fill - 14)
+            }
+        }
+        .frame(height: Self.height)
+        .animation(.easeOut(duration: 0.08), value: value)
+    }
+
+    /// Breite der Füllung; der Griff bleibt auch bei 0 sichtbar
+    private static func fill(_ value: Int, _ width: CGFloat) -> CGFloat {
+        let k: CGFloat = CGFloat(min(max(value, 0), 100)) / 100
+        return max(height - 10, width * k)
+    }
+}
+
+/// Kleiner runder Knopf (Prüfen, Farbwähler …)
 struct CompactButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(Theme.text)
             .environment(\.iconTint, Theme.accent)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(configuration.isPressed ? Theme.hot : Theme.fill, in: RoundedRectangle(cornerRadius: 4))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(configuration.isPressed ? 0.14 : 0.07), in: Capsule())
             .overlay {
-                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.accent, lineWidth: 1)
+                Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
             }
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -466,11 +446,12 @@ struct AccentButtonStyle: ButtonStyle {
 
         var body: some View {
             label
-                .font(.geist(16, 600))
+                .font(.geist(16, 700))
                 .foregroundStyle(Theme.ink)
                 .environment(\.iconTint, Theme.ink)
-                .frame(maxWidth: .infinity, minHeight: 50)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: Theme.accent.opacity(enabled ? 0.35 : 0), radius: 14)
                 .scaleEffect(pressed ? 0.97 : 1)
                 .opacity(enabled ? 1 : 0.4)
                 .animation(.easeOut(duration: 0.12), value: pressed)
@@ -478,62 +459,83 @@ struct AccentButtonStyle: ButtonStyle {
     }
 }
 
-/// Eckiger Knopf mit Symbol (Kopfzeile des Hauptmenüs)
-struct SquareIconButton: View {
-    let icon: IconKind
-    let label: String
-    let action: () -> Void
-
+/// Gelbes Schild „LÄUFT“ mit kleinen tanzenden Balken
+struct LiveTag: View {
     var body: some View {
-        Button(action: action) {
-            Icon(kind: icon, size: 18, color: Theme.text)
-                .frame(width: 42, height: 42)
-                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
-                .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1) }
+        HStack(spacing: 6) {
+            Clock { t in
+                HStack(alignment: .bottom, spacing: 2) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Capsule()
+                            .fill(Theme.ink)
+                            .frame(width: 2.5, height: Self.bar(i, t))
+                    }
+                }
+                .frame(height: 11, alignment: .bottom)
+            }
+            .frame(width: 12, height: 11)
+            Text("LÄUFT")
+                .font(.geistMono(10, 700))
+                .tracking(1.2)
+                .foregroundStyle(Theme.ink)
         }
-        .buttonStyle(PressStyle(scale: 0.92))
-        .accessibilityLabel(label)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Theme.accent, in: Capsule())
+        .shadow(color: Theme.accent.opacity(0.6), radius: 8)
+        .accessibilityLabel("Läuft")
+    }
+
+    private static func bar(_ i: Int, _ t: Double) -> CGFloat {
+        let speed: Double = 3 + Double(i) * 1.2
+        let swing: Double = abs(sin(t * speed + Double(i)))
+        return CGFloat(3 + 8 * swing)
     }
 }
 
 // MARK: - Szenen
 
+/// Szene als kleines Poster mit laufendem Bild (wie die Stimmungen im Hauptmenü)
 struct SceneCard: View {
     let scene: LightScene
     let on: Bool
     let action: () -> Void
 
-    private var flow: Flow? {
-        guard let id = scene.flowID else { return nil }
-        return Flow.all.first { $0.id == id }
-    }
+    static let height: CGFloat = 168
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                if let flow {
-                    EffectLEDs(flow: flow, base: scene.color, active: on, dot: 5, gap: 4)
-                } else {
-                    LEDPanel(colors: [scene.color], live: true, brightness: scene.brightness, dot: 5, gap: 4)
+            ZStack(alignment: .bottomLeading) {
+                MoodArtView(art: MoodArt.style(for: scene))
+                LinearGradient(colors: [.black.opacity(0), .black.opacity(0.65)], startPoint: UnitPoint(x: 0.5, y: 0.35), endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(scene.name)
+                        .font(.geist(19, 800))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(scene.summary.uppercased())
+                        .font(.geistMono(10, 600))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
-                Text(scene.name)
-                    .font(.geist(15, 600))
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text((flow.map { "\($0.name) · " } ?? "") + "\(scene.brightness) %")
-                    .font(.geistMono(10, 500))
-                    .tracking(0.8)
-                    .foregroundStyle(on ? Theme.accent : Theme.muted)
-                    .lineLimit(1)
+                .padding(14)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+            .frame(height: Self.height)
+            .clipShape(shape)
             .overlay {
-                RoundedRectangle(cornerRadius: 4).strokeBorder(on ? Theme.accent : Theme.hair, lineWidth: 1)
+                shape.strokeBorder(on ? Theme.accent : Theme.edge, lineWidth: on ? 2 : 1)
             }
+            .overlay(alignment: .topTrailing) {
+                if on { LiveTag().padding(10) }
+            }
+            .shadow(color: .black.opacity(0.4), radius: 12, y: 8)
         }
         .buttonStyle(PressStyle(scale: 0.97))
         .accessibilityLabel("Szene \(scene.name)")
+        .accessibilityValue(on ? "Läuft" : "")
     }
 }

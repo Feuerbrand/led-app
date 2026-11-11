@@ -23,6 +23,12 @@ enum Theme {
     static let ledOff = Color(rgb: 0x27251F)
     /// Dunkle Schrift auf Gelb
     static let ink = Color(rgb: 0x14130E)
+    /// Ausgeschaltete Karte
+    static let card = Color(rgb: 0x191813)
+    /// Leiser Rand um Karten und Kacheln
+    static let edge = Color.white.opacity(0.08)
+    /// Ecken der Kacheln
+    static let radius: CGFloat = 22
     static let curve = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)
 }
 

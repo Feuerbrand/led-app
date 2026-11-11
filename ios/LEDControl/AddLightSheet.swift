@@ -104,10 +104,10 @@ private struct ListStep: View {
                                 SignalBars(rssi: item.rssi)
                                 Icon(kind: .plus, size: 18, color: Theme.accent)
                             }
-                            .padding(14)
-                            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+                            .padding(16)
+                            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hair, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1)
                             }
                         }
                         .buttonStyle(PressStyle(scale: 0.98))
@@ -157,11 +157,12 @@ private struct NameStep: View {
                 .focused($focused)
                 .submitLabel(.done)
                 .onSubmit(add)
-                .padding(.horizontal, 14)
-                .frame(height: 58)
-                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 4))
+                .padding(.horizontal, 18)
+                .frame(height: 60)
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(focused ? Theme.accent : Theme.hair, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(focused ? Theme.accent : Theme.edge, lineWidth: focused ? 1.5 : 1)
                 }
                 .padding(.top, 22)
 
@@ -172,11 +173,11 @@ private struct NameStep: View {
                         name = idea
                     } label: {
                         Text(idea)
-                            .font(.geist(13, 500))
+                            .font(.geist(13, on ? 700 : 600))
                             .foregroundStyle(on ? Theme.ink : Theme.text)
-                            .frame(maxWidth: .infinity, minHeight: 38)
-                            .background(on ? Theme.accent : Theme.panel, in: RoundedRectangle(cornerRadius: 4))
-                            .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(on ? Theme.accent : Theme.hair, lineWidth: 1) }
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .background(on ? Theme.accent : Theme.panel, in: Capsule())
+                            .overlay { Capsule().strokeBorder(on ? Theme.accent : Theme.edge, lineWidth: 1) }
                     }
                     .buttonStyle(PressStyle(scale: 0.94))
                 }
@@ -193,11 +194,10 @@ private struct NameStep: View {
             .padding(.top, 26)
 
             Button(action: back) {
-                Text("ANDERES LICHT WÄHLEN")
-                    .font(.geistMono(11, 600))
-                    .tracking(1.2)
-                    .foregroundStyle(Theme.muted)
+                Text("Anderes Licht wählen")
+                    .font(.geist(14, 600))
             }
+            .buttonStyle(CompactButtonStyle())
             .padding(.top, 16)
         }
         .onAppear { focused = true }

@@ -23,6 +23,19 @@ extension RGB {
     }
 }
 
+extension LightScene {
+    /// Kurz, was die Szene macht: Effekt oder Farbe, dazu die Helligkeit
+    var summary: String {
+        let what: String
+        if let id = flowID, let flow = Flow.everything.first(where: { $0.id == id }) {
+            what = flow.name
+        } else {
+            what = color.hex
+        }
+        return "\(what) · \(brightness) %"
+    }
+}
+
 // MARK: - Bild einer Stimmung
 
 /// Wie das Poster einer Stimmung aussieht – abgeleitet aus Name, Farbe und Effekt der Szene
