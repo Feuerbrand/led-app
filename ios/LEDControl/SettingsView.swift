@@ -499,7 +499,7 @@ private struct TestFlightTile: View {
                         .foregroundStyle(Theme.muted)
                 }
             }
-            Text("In der TestFlight-App bei LED Controler „Automatische Updates“ einschalten. Jede Version läuft 90 Tage; GitHub baut jeden Monat automatisch eine neue.")
+            Text("In der TestFlight-App bei LED Controller „Automatische Updates“ einschalten. Jede Version läuft 90 Tage; GitHub baut jeden Monat automatisch eine neue.")
                 .font(.geist(12, 400))
                 .foregroundStyle(Theme.muted)
                 .lineSpacing(2)
@@ -542,8 +542,8 @@ private struct ShortcutsTile: View {
     @State private var showTip = true
 
     private static let phrases = [
-        "„LED Controler an“ / „LED Controler aus“",
-        "„Schalte Wohnzimmer mit LED Controler an“",
+        "„LED Controller an“ / „LED Controller aus“",
+        "„Schalte Wohnzimmer mit LED Controller an“",
         "„Starte Kino mit LED Control“",
     ]
 
@@ -561,7 +561,7 @@ private struct ShortcutsTile: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Icon(kind: .flash, size: 17, color: Theme.accent)
-                Text("„Hey Siri, LED Controler an“")
+                Text("„Hey Siri, LED Controller an“")
                     .font(.geist(15, 600))
                     .foregroundStyle(Theme.text)
             }
@@ -675,7 +675,7 @@ struct Footer: View {
             .frame(width: 16, height: 16)
             HStack(spacing: 0) {
                 Text("LED").foregroundStyle(Theme.text)
-                Text("CONTROLER").foregroundStyle(Theme.accent)
+                Text("CONTROLLER").foregroundStyle(Theme.accent)
             }
             .font(.geist(12, 700))
             .tracking(0.96)

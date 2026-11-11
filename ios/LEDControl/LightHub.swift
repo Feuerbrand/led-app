@@ -516,7 +516,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                 onLog("Bluetooth ist aus – bitte im Kontrollzentrum oder in den Einstellungen einschalten.")
             case .unauthorized:
                 bluetooth = .denied
-                onLog("Bitte erlauben: Einstellungen → Apps → LED Controler → Bluetooth.")
+                onLog("Bitte erlauben: Einstellungen → Apps → LED Controller → Bluetooth.")
             case .unsupported:
                 bluetooth = .unsupported
                 onLog("Dieses Gerät kann kein Bluetooth LE.")

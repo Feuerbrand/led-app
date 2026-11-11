@@ -465,7 +465,7 @@ final class LightController {
         meter.start { [weak self] ok in
             guard let self else { return }
             if !ok {
-                self.note("Musik-Modus: Mikrofon nicht verfügbar. Erlauben unter Einstellungen → Apps → LED Controler → Mikrofon.")
+                self.note("Musik-Modus: Mikrofon nicht verfügbar. Erlauben unter Einstellungen → Apps → LED Controller → Mikrofon.")
                 if self.lookOf(t).flowID == Flow.music.id {
                     self.release(self.ids(for: t))
                     self.update(t) { $0.flowID = nil }

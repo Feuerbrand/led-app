@@ -242,7 +242,7 @@ private struct IntroPage: View {
     @State private var stripGone = false
     @State private var orb = false
 
-    private static let letters: [String] = "LED Controler".map { String($0) }
+    private static let letters: [String] = "LED Controller".map { String($0) }
 
     var body: some View {
         VStack(spacing: 0) {

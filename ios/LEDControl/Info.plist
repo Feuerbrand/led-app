@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>de</string>
 	<key>CFBundleDisplayName</key>
-	<string>LED Controler</string>
+	<string>LED Controller</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -38,9 +38,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Für „Farbe abfotografieren“: Die App misst nur die Farbe in der Bildmitte und speichert nichts.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>LED Controler verbindet sich über Bluetooth mit deinen Lichtern, um Licht, Farbe und Effekte zu steuern.</string>
+	<string>LED Controller verbindet sich über Bluetooth mit deinen Lichtern, um Licht, Farbe und Effekte zu steuern.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Für den Musik-Modus hört LED Controler über das Mikrofon mit, wie laut es ist, und lässt die Lichter im Takt leuchten. Es wird nichts aufgenommen oder gespeichert.</string>
+	<string>Für den Musik-Modus hört LED Controller über das Mikrofon mit, wie laut es ist, und lässt die Lichter im Takt leuchten. Es wird nichts aufgenommen oder gespeichert.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Geist.ttf</string>

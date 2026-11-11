@@ -1,4 +1,4 @@
-# Hilfe zu LED Controler
+# Hilfe zu LED Controller
 
 ## Welche Lichter funktionieren?
 
@@ -8,7 +8,7 @@ LED-Leisten und -Lampen mit Bluetooth, die sich als **ELK-BLEDOM** (bzw. ELK-BLE
 
 - Licht einschalten und in die Nähe gehen.
 - **Andere Licht-Apps vollständig schließen** (auch im App-Umschalter wegwischen). Ein Licht nimmt immer nur eine Verbindung an.
-- Bluetooth am iPhone einschalten und der App erlauben: *Einstellungen → Apps → LED Controler → Bluetooth*.
+- Bluetooth am iPhone einschalten und der App erlauben: *Einstellungen → Apps → LED Controller → Bluetooth*.
 - Hat dein Licht einen anderen Namen: in den **Einstellungen** „Alle Bluetooth-Geräte zeigen“ einschalten und es über **+** hinzufügen.
 
 ## Mehrere Lichter
@@ -27,7 +27,7 @@ Die fließenden Effekte und der Musik-Modus werden von der App berechnet und lau
 
 ## Siri und Kurzbefehle
 
-„Hey Siri, LED Controler an“ bzw. „… aus“. In der Kurzbefehle-App gibt es außerdem „Szene starten“ und „Helligkeit setzen“.
+„Hey Siri, LED Controller an“ bzw. „… aus“. In der Kurzbefehle-App gibt es außerdem „Szene starten“ und „Helligkeit setzen“.
 
 ## Ohne Licht ausprobieren
 
