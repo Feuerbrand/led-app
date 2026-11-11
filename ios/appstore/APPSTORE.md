@@ -2,6 +2,8 @@
 
 Alles, was App Store Connect für die Veröffentlichung abfragt, in der Reihenfolge der Seiten. Die Längen sind geprüft (Apples Grenzen in Klammern).
 
+**Automatisch:** Name, Untertitel, Kategorien, Werbetext, Beschreibung, Schlüsselwörter, Support- und Datenschutz-Link sowie die Bildschirmfotos lädt jeder Build selbst zu App Store Connect hoch (Schritt „App-Store-Texte und Bilder hochladen“). Die Texte dafür liegen in [`ios/fastlane/metadata/de-DE`](../fastlane/metadata/de-DE) – dort ändern, nicht hier. Von Hand bleiben: Altersfreigabe, App-Datenschutz, Preis, Händlerstatus, Copyright, Kontakt und Notizen für die Prüfer, Build auswählen und einreichen.
+
 ## App-Informationen
 
 | Feld | Eintrag |
