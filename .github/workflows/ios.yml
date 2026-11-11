@@ -479,6 +479,7 @@ jobs:
             --skip_binary_upload true \
             --submit_for_review false \
             --run_precheck_before_submit false \
+            --automatic_release true \
             --force true
 
       - name: API-Schlüssel löschen

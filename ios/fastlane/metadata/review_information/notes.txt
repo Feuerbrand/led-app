@@ -1,0 +1,9 @@
+LED Controller controls Bluetooth LE LED strips and lamps (controllers that advertise as "ELK-BLEDOM" or "MELK", GATT service FFF0).
+
+No hardware? Every feature can be tried in demo mode: on the home screen tap "Ohne Licht ausprobieren" (try without a light), or open the settings (gear icon, top right) → "Lichter verwalten" and switch on "Vorführmodus". Then tap "Alle steuern" – color, effects and scenes ("Farbe", "Effekte", "Szenen") work without a connected light. On first launch a short introduction is shown; it can be skipped ("Überspringen").
+
+No account or login. The microphone is only used in the optional music mode ("Effekte" → "Musik") to measure loudness; nothing is recorded, stored or transmitted. The camera is only used in the optional "Farbe abfotografieren" feature ("Farbe" tab): the app reads the average color in the center of the live image to set the light; no photo or video is taken, stored or transmitted. The app makes no network connections.
+
+Control Center / Lock Screen controls and widgets open the app briefly to send the command over Bluetooth.
+
+Siri: "LED Controller an" / "LED Controller aus".
