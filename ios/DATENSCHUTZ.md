@@ -1,4 +1,4 @@
-# Datenschutzerklärung – LED Control (iPhone-App)
+# Datenschutzerklärung – LED Controler (iPhone-App)
 
 Stand: November 2026
 
@@ -11,7 +11,7 @@ E-Mail: [E-Mail-Adresse]
 
 ## Kurz gesagt
 
-LED Control erhebt **keine personenbezogenen Daten**. Es gibt kein Benutzerkonto, keine Werbung, kein Tracking und keine Analyse. Alles, was die App sich merkt, bleibt auf deinem iPhone.
+LED Controler erhebt **keine personenbezogenen Daten**. Es gibt kein Benutzerkonto, keine Werbung, kein Tracking und keine Analyse. Alles, was die App sich merkt, bleibt auf deinem iPhone.
 
 ## Bluetooth
 
@@ -19,7 +19,7 @@ Die App verbindet sich über Bluetooth direkt mit deinen LED-Lichtern, um Farbe,
 
 ## Mikrofon (nur Musik-Modus)
 
-Nur wenn du den Musik-Modus einschaltest, nutzt die App das Mikrofon. Sie misst dabei ausschließlich, wie laut es gerade ist, und lässt die Lichter danach leuchten. Es wird **nichts aufgenommen, gespeichert oder übertragen**. Den Zugriff kannst du jederzeit unter *Einstellungen → Apps → LED Control* entziehen.
+Nur wenn du den Musik-Modus einschaltest, nutzt die App das Mikrofon. Sie misst dabei ausschließlich, wie laut es gerade ist, und lässt die Lichter danach leuchten. Es wird **nichts aufgenommen, gespeichert oder übertragen**. Den Zugriff kannst du jederzeit unter *Einstellungen → Apps → LED Controler* entziehen.
 
 ## Auf dem Gerät gespeicherte Daten
 
@@ -29,7 +29,7 @@ Die App speichert auf deinem iPhone: deine Lichter (Name, Kennung, eigener Name)
 
 Für „Farbe abfotografieren“ nutzt die App die Kamera, aber nur, solange diese Ansicht offen ist. Sie misst dabei nur die Farbe in der Bildmitte; es werden keine Fotos oder Videos aufgenommen, gespeichert oder übertragen.
 
-Wenn du Siri oder die Kurzbefehle-App mit LED Control verwendest, verarbeitet Apple die Sprachbefehle nach seinen eigenen Datenschutzbestimmungen. Die App selbst erhält nur den jeweiligen Befehl (z. B. „Licht an“).
+Wenn du Siri oder die Kurzbefehle-App mit LED Controler verwendest, verarbeitet Apple die Sprachbefehle nach seinen eigenen Datenschutzbestimmungen. Die App selbst erhält nur den jeweiligen Befehl (z. B. „Licht an“).
 
 ## Internetverbindung
 

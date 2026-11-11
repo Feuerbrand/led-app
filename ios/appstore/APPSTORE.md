@@ -32,7 +32,7 @@ Deine LED-Leiste, endlich richtig gesteuert: Farbe abfotografieren, Musik-Modus,
 ```
 Steuere deine Bluetooth-LED-Leisten direkt vom iPhone – schnell, schön und ohne Umwege.
 
-LED Control verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü schimmert jedes Licht in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
+LED Controler verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü schimmert jedes Licht in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
 
 FARBE ABFOTOGRAFIEREN
 • Kamera auf etwas halten – auf ein Kissen, ein Poster, ein Getränk – und dein Licht leuchtet live in genau dieser Farbe
@@ -60,7 +60,7 @@ LICHTER
 KONTROLLZENTRUM, SPERRBILDSCHIRM UND SIRI
 • Knöpfe für das Kontrollzentrum und den Sperrbildschirm: an/aus und Gute Nacht
 • Widgets für den Home-Bildschirm
-• „Hey Siri, LED Control an“ und „… aus“
+• „Hey Siri, LED Controler an“ und „… aus“
 • Szenen und Helligkeit in der Kurzbefehle-App – für Automationen und die Aktionstaste
 
 PASSENDE LICHTER
@@ -94,7 +94,7 @@ https://github.com/Feuerbrand/led-app/blob/main/ios/SUPPORT.md
 - **Notizen** (auf Englisch, die Prüfer arbeiten weltweit):
 
 ```
-LED Control controls Bluetooth LE LED strips and lamps (controllers that advertise as "ELK-BLEDOM" or "MELK", GATT service FFF0).
+LED Controler controls Bluetooth LE LED strips and lamps (controllers that advertise as "ELK-BLEDOM" or "MELK", GATT service FFF0).
 
 No hardware? Every feature can be tried in demo mode: on the home screen tap "Ohne Licht ausprobieren" (try without a light), or open the settings (gear icon, top right) → "Lichter verwalten" and switch on "Vorführmodus". Then tap "Alle steuern" – color, effects and scenes ("Farbe", "Effekte", "Szenen") work without a connected light. On first launch a short introduction is shown; it can be skipped ("Überspringen").
 
@@ -104,7 +104,7 @@ No account or login. The microphone is only used in the optional music mode ("Ef
 
 Control Center / Lock Screen controls and widgets open the app briefly to send the command over Bluetooth.
 
-Siri: "LED Control an" / "LED Control aus".
+Siri: "LED Controler an" / "LED Controler aus".
 ```
 
 Ein **kurzes Video** (30 Sekunden genügen: App öffnen, Leiste verbindet sich, Farbe und ein Effekt wechseln) hilft sehr, weil Apple keine Leiste zum Testen hat. Am einfachsten mit der Bildschirmaufnahme des iPhones aufnehmen und das Licht gleichzeitig mit einem zweiten Handy filmen – oder das Licht im Hintergrund mit ins Bild nehmen. Hochladen z. B. als nicht gelistetes YouTube-Video und den Link oben eintragen.

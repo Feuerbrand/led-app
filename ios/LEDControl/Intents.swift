@@ -1,7 +1,7 @@
 import AppIntents
 
 // Siri, Kurzbefehle-App und Aktionstaste. Die Befehle sind ohne Einrichtung sofort da:
-// „Hey Siri, LED Control an“ / „… aus“, „Schalte Wohnzimmer mit LED Control an“, „Starte Kino mit LED Control“.
+// „Hey Siri, LED Controler an“ / „… aus“, „Schalte Wohnzimmer mit LED Controler an“, „Starte Kino mit LED Control“.
 // Die App öffnet sich dafür kurz, verbindet sich und führt den Befehl aus.
 
 // MARK: - Lichter und Szenen als Auswahl

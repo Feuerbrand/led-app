@@ -70,7 +70,7 @@ struct LightsWidget: Widget {
         StaticConfiguration(kind: "de.feuerbrand.ledcontrol.lights", provider: LightsProvider()) { _ in
             LightsWidgetView()
         }
-        .configurationDisplayName("LED Control")
+        .configurationDisplayName("LED Controler")
         .description("Lichter mit einem Tippen schalten.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular])
     }
@@ -121,7 +121,7 @@ private struct SmallView: View {
         VStack(alignment: .leading, spacing: 0) {
             BulbBadge()
             Spacer(minLength: 6)
-            Text("LED Control")
+            Text("LED Controler")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
             Text("Antippen: an/aus")
@@ -141,7 +141,7 @@ private struct MediumView: View {
             VStack(alignment: .leading, spacing: 0) {
                 BulbBadge()
                 Spacer(minLength: 6)
-                Text("LED Control")
+                Text("LED Controler")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
             }

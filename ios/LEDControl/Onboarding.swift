@@ -242,7 +242,7 @@ private struct IntroPage: View {
     @State private var stripGone = false
     @State private var orb = false
 
-    private static let letters: [String] = "LED Control".map { String($0) }
+    private static let letters: [String] = "LED Controler".map { String($0) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -262,7 +262,7 @@ private struct IntroPage: View {
                         .reveal(1.45 + Double(i) * 0.045)
                 }
             }
-            .font(.geist(46, 800))
+            .font(.geist(40, 800))
             .foregroundStyle(Theme.text)
             .padding(.top, 26)
 
