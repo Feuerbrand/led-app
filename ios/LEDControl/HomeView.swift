@@ -183,8 +183,10 @@ private struct MoodRail: View {
     @State private var removing: LightScene?
 
     private var items: [MoodItem] {
-        light.scenes.map { MoodItem(id: $0.id.uuidString, kind: .scene($0)) }
-            + [MoodItem(id: "sunrise", kind: .sunrise), MoodItem(id: "create", kind: .create)]
+        var list: [MoodItem] = light.scenes.map { scene in MoodItem(id: scene.id.uuidString, kind: .scene(scene)) }
+        list.append(MoodItem(id: "sunrise", kind: .sunrise))
+        list.append(MoodItem(id: "create", kind: .create))
+        return list
     }
 
     private func isActive(_ scene: LightScene) -> Bool {
@@ -287,8 +289,9 @@ private struct LightStack: View {
     static let peek: CGFloat = 80
 
     var body: some View {
-        let frontID = front.flatMap { id in lights.contains { $0.id == id } ? id : nil } ?? lights.first?.id
-        let order = lights.filter { $0.id != frontID } + lights.filter { $0.id == frontID }
+        let frontID: UUID? = Self.frontID(front, lights)
+        let order: [Light] = Self.order(lights, front: frontID)
+        let height: CGFloat = CGFloat(max(order.count - 1, 0)) * Self.peek + LightCard.height
         ZStack(alignment: .top) {
             ForEach(Array(order.enumerated()), id: \.element.id) { index, item in
                 let isFront = item.id == frontID
@@ -304,8 +307,21 @@ private struct LightStack: View {
                 .enter(index)
             }
         }
-        .frame(height: CGFloat(max(order.count - 1, 0)) * Self.peek + LightCard.height, alignment: .top)
+        .frame(height: height, alignment: .top)
         .sensoryFeedback(.selection, trigger: front)
+    }
+
+    /// Vordere Karte: die zuletzt angetippte, sonst das erste Licht
+    private static func frontID(_ front: UUID?, _ lights: [Light]) -> UUID? {
+        if let front, lights.contains(where: { $0.id == front }) { return front }
+        return lights.first?.id
+    }
+
+    /// Reihenfolge im Stapel: die vordere Karte kommt nach unten (ganz sichtbar)
+    private static func order(_ lights: [Light], front: UUID?) -> [Light] {
+        var list: [Light] = lights.filter { $0.id != front }
+        list.append(contentsOf: lights.filter { $0.id == front })
+        return list
     }
 }
 
@@ -333,7 +349,9 @@ enum CardPalette {
     /// Dunkle Schrift auf hellen Karten, helle Schrift auf dunklen
     static func darkText(_ colors: [RGB]) -> Bool {
         guard !colors.isEmpty else { return false }
-        return colors.map(\.perceived).reduce(0, +) / Double(colors.count) > 0.45
+        var sum: Double = 0
+        for c in colors { sum += c.perceived }
+        return sum / Double(colors.count) > 0.45
     }
 }
 
@@ -465,29 +483,51 @@ private struct CardSurface: View {
     let seed: Double
 
     var body: some View {
+        let stops: [Color] = Self.loop(colors)
         Clock { t in
             GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                let flow = ((t + seed * 3) / 9).truncatingRemainder(dividingBy: 1)
-                let loop = colors.isEmpty ? [RGB(40, 40, 40)] : colors
+                let w: CGFloat = geo.size.width
+                let h: CGFloat = geo.size.height
+                let flow: Double = ((t + seed * 3) / 9).truncatingRemainder(dividingBy: 1)
+                let shift: CGFloat = -w * CGFloat(flow)
+                let sheenX: CGFloat = w * Self.sheen(t + seed)
                 ZStack(alignment: .topLeading) {
-                    LinearGradient(colors: (loop + loop + [loop[0]]).map(\.color),
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(colors: stops, startPoint: .topLeading, endPoint: .bottomTrailing)
                         .frame(width: w * 2, height: h)
-                        .offset(x: -w * CGFloat(flow))
+                        .offset(x: shift)
                     // Lichtreflex: läuft alle fünf Sekunden über die Karte
-                    let s = ((t + seed) / 5).truncatingRemainder(dividingBy: 1)
-                    LinearGradient(colors: [.clear, .white.opacity(0.3), .clear], startPoint: .leading, endPoint: .trailing)
+                    LinearGradient(colors: [Color.clear, Color.white.opacity(0.3), Color.clear], startPoint: .leading, endPoint: .trailing)
                         .frame(width: 90, height: h * 1.8)
                         .rotationEffect(.degrees(18))
-                        .position(x: w * CGFloat(-0.3 + min(s / 0.6, 1) * 1.6), y: h / 2)
+                        .position(x: sheenX, y: h / 2)
                 }
             }
         }
         .overlay { Grain() }
-        .overlay { Color.black.opacity((1 - Double(brightness) / 100) * 0.4) }
+        .overlay { Color.black.opacity(Self.dim(brightness)) }
         .allowsHitTesting(false)
+    }
+
+    /// Farben zweimal hintereinander, damit der Verlauf beim Wandern nahtlos weiterläuft
+    private static func loop(_ colors: [RGB]) -> [Color] {
+        let base: [RGB] = colors.isEmpty ? [RGB(40, 40, 40)] : colors
+        var all: [RGB] = base
+        all.append(contentsOf: base)
+        all.append(base[0])
+        return all.map { $0.color }
+    }
+
+    /// Stelle des Lichtreflexes (Anteil der Breite): läuft in 3 s über die Karte, dann 2 s Pause
+    private static func sheen(_ t: Double) -> CGFloat {
+        let s: Double = (t / 5).truncatingRemainder(dividingBy: 1)
+        let k: Double = min(s / 0.6, 1)
+        return CGFloat(-0.3 + k * 1.6)
+    }
+
+    /// Dunkler bei wenig Helligkeit
+    private static func dim(_ brightness: Int) -> Double {
+        let b: Double = Double(min(max(brightness, 0), 100)) / 100
+        return (1 - b) * 0.4
     }
 }
 
@@ -738,7 +778,7 @@ private struct QuickRow: View {
         .sensoryFeedback(.impact(weight: .light), trigger: rolls)
         .confirmationDialog("Timer", isPresented: $askTimer, titleVisibility: .visible) {
             ForEach([15, 30, 60, 90], id: \.self) { minutes in
-                Button(minutes < 60 ? "\(minutes) Minuten" : (minutes == 60 ? "1 Stunde" : "1,5 Stunden")) {
+                Button(Self.label(minutes)) {
                     light.startSleepTimer(minutes: minutes)
                 }
             }
@@ -749,6 +789,12 @@ private struct QuickRow: View {
         } message: {
             Text("Danach gehen alle Lichter aus. Lass die App dafür offen – der Bildschirm bleibt so lange an.")
         }
+    }
+
+    private static func label(_ minutes: Int) -> String {
+        if minutes == 60 { return "1 Stunde" }
+        if minutes == 90 { return "1,5 Stunden" }
+        return "\(minutes) Minuten"
     }
 }
 
@@ -823,11 +869,17 @@ private struct DancingBars: View {
                 ForEach(0..<4, id: \.self) { i in
                     Capsule()
                         .fill(Theme.ink)
-                        .frame(width: 3, height: 5 + 14 * abs(sin(t * (2.8 + Double(i) * 1.1) + Double(i) * 0.9)))
+                        .frame(width: 3, height: Self.bar(i, t))
                 }
             }
             .frame(height: 20, alignment: .bottom)
         }
+    }
+
+    private static func bar(_ i: Int, _ t: Double) -> CGFloat {
+        let speed: Double = 2.8 + Double(i) * 1.1
+        let swing: Double = abs(sin(t * speed + Double(i) * 0.9))
+        return CGFloat(5 + 14 * swing)
     }
 }
 
