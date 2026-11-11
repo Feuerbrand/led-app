@@ -84,7 +84,7 @@ https://github.com/Feuerbrand/led-app/blob/main/ios/SUPPORT.md
 
 **Copyright**
 ```
-2026 [dein Name oder deine Firma]
+2026 Robin Westphal
 ```
 
 **Bildschirmfotos:** die Bilder aus dem GitHub-Lauf (Artifact **app-store-bilder**) beim größten iPhone-Format hochladen. Die kleineren Formate erzeugt Apple daraus selbst.

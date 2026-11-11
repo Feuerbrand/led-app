@@ -4,10 +4,10 @@ Stand: November 2026
 
 ## Verantwortlich
 
-[Vor- und Nachname bzw. Firma]
-[Straße und Hausnummer]
-[PLZ und Ort]
-E-Mail: [E-Mail-Adresse]
+Robin Westphal
+Niederalteicher Weg 2
+94491 Hengersberg
+E-Mail: r32999656@gmail.com
 
 ## Kurz gesagt
 

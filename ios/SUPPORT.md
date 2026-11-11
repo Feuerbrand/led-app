@@ -31,10 +31,10 @@ Die fließenden Effekte und der Musik-Modus werden von der App berechnet und lau
 
 ## Ohne Licht ausprobieren
 
-Im Hauptmenü **Ohne Licht ausprobieren** antippen oder in den **Einstellungen** den **Vorführmodus** einschalten.
+Im Hauptmenü **Ohne Licht ausprobieren** antippen oder unter **Einstellungen → Lichter verwalten** den **Vorführmodus** einschalten.
 
 ## Kontakt
 
-E-Mail: [E-Mail-Adresse]
+E-Mail: r32999656@gmail.com
 
 Datenschutz: siehe [Datenschutzerklärung](DATENSCHUTZ.md).
