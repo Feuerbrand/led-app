@@ -100,6 +100,7 @@ private struct SettingsRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle(scale: 0.98))
+        .accessibilityIdentifier(title)
     }
 }
 

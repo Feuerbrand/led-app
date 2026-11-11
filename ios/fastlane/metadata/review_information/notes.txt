@@ -7,3 +7,5 @@ No account or login. The microphone is only used in the optional music mode ("Ef
 Control Center / Lock Screen controls and widgets open the app briefly to send the command over Bluetooth.
 
 Siri: "LED Controller an" / "LED Controller aus".
+
+A screen recording of a short tour through the app (demo mode, touches shown as circles) is attached.

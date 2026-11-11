@@ -6,6 +6,8 @@ enum Onboarding {
     /// Für die automatischen App-Store-Bilder keine Einführung
     static var skipped: Bool {
         let defaults = UserDefaults.standard
+        // „-showIntro YES“ zeigt sie trotzdem (für das Vorführ-Video)
+        if defaults.bool(forKey: "showIntro") { return false }
         return defaults.string(forKey: "screenshotPage") != nil || defaults.bool(forKey: "demo")
     }
 
@@ -509,6 +511,7 @@ private struct ColorPage: View {
                     }
                     .frame(width: 250, height: 250)
                     .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+                    .accessibilityIdentifier("intro-farbrad")
                 }
             }
             .frame(height: 300)

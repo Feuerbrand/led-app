@@ -76,6 +76,8 @@ struct ContentView: View {
         .onAppear {
             // Beim ersten Start fragt erst die Einführung nach Bluetooth
             if Onboarding.mayStartBluetooth { light.start() }
+            // Vorführ-Video: Finger als Kreise zeigen
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { TourTouches.install() }
             // Für die automatischen App-Store-Bilder: Startseite per Startargument wählen
             switch UserDefaults.standard.string(forKey: "screenshotPage") {
             case "color", "effects", "scenes": nav.path = [.control(.all)]

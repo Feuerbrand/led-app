@@ -59,11 +59,31 @@ targets:
         SKIP_INSTALL: YES
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
 
+  # Tour durch die App fürs Vorführ-Video (läuft nur im Simulator, siehe Workflow)
+  LEDControlUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: LEDControl
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.feuerbrand.ledcontrol.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: LEDControl
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+
 schemes:
   LEDControl:
     build:
       targets:
         LEDControl: all
+    test:
+      config: Debug
+      targets:
+        - LEDControlUITests
     run:
       config: Debug
     archive:

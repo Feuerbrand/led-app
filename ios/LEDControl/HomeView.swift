@@ -116,6 +116,7 @@ struct RoundIconButton: View {
         }
         .buttonStyle(PressStyle(scale: 0.9))
         .accessibilityLabel(label)
+        .accessibilityIdentifier(label)
     }
 }
 
@@ -340,6 +341,7 @@ private struct HomeDock: View {
                 .background(Theme.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(PressStyle(scale: 0.96))
+            .accessibilityIdentifier("alle-steuern")
         }
         .padding(10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))

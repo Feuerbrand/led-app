@@ -58,6 +58,7 @@ struct ControlView: View {
                 .rise(0)
 
             BrightnessBar(target: target)
+                .accessibilityIdentifier("helligkeit")
                 .padding(.top, 18)
                 .rise(1)
 
@@ -361,6 +362,7 @@ private struct SectionTabs: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tab-\(s.rawValue)")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
@@ -396,6 +398,7 @@ private struct ColorSection: View {
             RecentColors()
 
             ColorWheel(color: light.base) { light.pick($0, instant: true) }
+                .accessibilityIdentifier("farbrad")
                 .frame(maxWidth: 280)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 26)
@@ -515,6 +518,7 @@ private struct EffectsSection: View {
                 }
             }
             TempoRow(value: light.speed) { light.setSpeed($0) }
+                .accessibilityIdentifier("tempo")
                 .padding(.top, 8)
             if multi {
                 WaveRow()

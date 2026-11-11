@@ -415,6 +415,31 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      # Vorführ-Video: ein UI-Test tippt sich durch die App (Vorführmodus), der Simulator nimmt dabei auf.
+      # Die App zeigt jeden Finger als hellen Kreis („-tour YES“).
+      - name: Tour als Video aufnehmen
+        continue-on-error: true
+        working-directory: ios
+        run: |
+          xcrun simctl uninstall "$SIM" de.feuerbrand.ledcontrol || true
+          mkdir -p ../video
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -destination "id=$SIM"             -derivedDataPath build-test CODE_SIGNING_ALLOWED=NO -quiet build-for-testing
+          xcrun simctl io "$SIM" recordVideo --codec=h264 --force ../video/tour.mov &
+          REC=$!
+          sleep 2
+          xcodebuild -project LEDControl.xcodeproj -scheme LEDControl -destination "id=$SIM"             -derivedDataPath build-test CODE_SIGNING_ALLOWED=NO             -only-testing:LEDControlUITests/TourUITests/testTour test-without-building             || echo "::warning::Die Tour ist nicht ganz durchgelaufen"
+          kill -INT "$REC"
+          wait "$REC" || true
+          ls -lh ../video
+
+      - name: Video hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-store-video
+          path: video/
+          if-no-files-found: warn
+          retention-days: 90
+
   # Texte, Kategorien, Links und Bildschirmfotos zu App Store Connect hochladen (fastlane deliver).
   # Setzt auch die Versionsnummer der vorbereiteten App-Store-Version auf die dieses Builds.
   # Eingereicht wird nichts – das passiert von Hand in App Store Connect.
@@ -432,6 +457,13 @@ jobs:
         with:
           name: app-store-bilder
           path: ios/fastlane/screenshots/de-DE
+
+      - name: Video holen
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: app-store-video
+          path: ios/fastlane/video
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -468,7 +500,10 @@ jobs:
           FASTLANE_HIDE_CHANGELOG: '1'
         run: |
           ls -l fastlane/screenshots/de-DE
-          fastlane deliver \
+          # Das Video der Tour geht als Anhang an die Prüfer
+          EXTRA=()
+          if [ -f fastlane/video/tour.mov ]; then EXTRA=(--app_review_attachment_file fastlane/video/tour.mov); fi
+          fastlane deliver "${EXTRA[@]}" \
             --api_key_path "$ASC_API_JSON" \
             --app_identifier de.feuerbrand.ledcontrol \
             --platform ios \
