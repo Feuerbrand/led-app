@@ -500,6 +500,8 @@ jobs:
           FASTLANE_HIDE_CHANGELOG: '1'
         run: |
           ls -l fastlane/screenshots/de-DE
+          # Die englische Seite (Hauptsprache) zeigt dieselben Bilder
+          cp -r fastlane/screenshots/de-DE fastlane/screenshots/en-GB
           # Das Video der Tour geht als Anhang an die Prüfer
           EXTRA=()
           if [ -f fastlane/video/tour.mov ]; then EXTRA=(--app_review_attachment_file fastlane/video/tour.mov); fi
