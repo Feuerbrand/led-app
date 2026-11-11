@@ -24,6 +24,9 @@ targets:
       - path: LEDControl
         excludes:
           - Info.plist                    # wird über INFOPLIST_FILE eingebunden, nicht als Ressource kopiert
+      - path: Shared                      # Befehle für Kontrollzentrum und Widgets (auch in der Erweiterung)
+    dependencies:
+      - target: LEDWidgets                # Knöpfe für Kontrollzentrum, Sperrbildschirm und Home-Bildschirm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.feuerbrand.ledcontrol
@@ -34,6 +37,27 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1"       # nur iPhone
+
+  # Widget-Erweiterung: Kontrollzentrum und Sperrbildschirm (ab iOS 18), Home-Bildschirm
+  LEDWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: LEDWidgets
+        excludes:
+          - Info.plist
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.feuerbrand.ledcontrol.widgets
+        PRODUCT_NAME: LEDWidgets
+        INFOPLIST_FILE: LEDWidgets/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
 
 schemes:
   LEDControl:

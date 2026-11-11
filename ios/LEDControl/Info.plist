@@ -35,6 +35,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Für „Farbe abfotografieren“: Die App misst nur die Farbe in der Bildmitte und speichert nichts.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>LED Control verbindet sich über Bluetooth mit deinen Lichtern, um Licht, Farbe und Effekte zu steuern.</string>
 	<key>NSMicrophoneUsageDescription</key>

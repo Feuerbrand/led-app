@@ -78,7 +78,7 @@ struct ContentView: View {
             if Onboarding.mayStartBluetooth { light.start() }
             // Für die automatischen App-Store-Bilder: Startseite per Startargument wählen
             switch UserDefaults.standard.string(forKey: "screenshotPage") {
-            case "color", "effects": nav.path = [.control(.all)]
+            case "color", "effects", "scenes": nav.path = [.control(.all)]
             case "light": nav.path = [.control(light.hub.mine.first.map { Target.light($0.id) } ?? .all)]
             case "settings": nav.path = [.settings]
             default: break

@@ -787,9 +787,8 @@ final class LightController {
     }
 
     /// Sonnenaufgang auf allen Lichtern: langsam von dunklem Rot bis Warmweiß, danach bleibt es hell
-    func startSunrise(seconds: Double = 90) {
+    func startSunrise(seconds: Double = 90, for t: Target = .all) {
         cancelGoodnight()
-        let t = Target.all
         if t == target {
             swatch = nil
             bar = nil
@@ -859,8 +858,7 @@ final class LightController {
 
     /// Gute Nacht: alle Lichter werden warm und dimmen langsam herunter, am Ende gehen sie aus.
     /// Läuft, solange die App offen ist (der Bildschirm bleibt so lange an).
-    func startGoodnight(minutes: Double = 10) {
-        let t = Target.all
+    func startGoodnight(minutes: Double = 10, for t: Target = .all) {
         if t == target {
             swatch = nil
             bar = nil
@@ -875,7 +873,7 @@ final class LightController {
             var last = from
             while goodnight == ramp {
                 // Selbst ausgeschaltet: nichts mehr tun
-                if allLook.power == false {
+                if lookOf(t).power == false {
                     goodnight = nil
                     break
                 }
@@ -906,7 +904,7 @@ final class LightController {
     // MARK: - Kurzbefehle (ledcontrol://…), wirken immer auf alle Lichter
 
     /// Befehle von außen, z. B. aus der Kurzbefehle-App:
-    /// ledcontrol://on · off · toggle · color?hex=FF7A00 · brightness?value=40 · scene?name=Kino · flow?id=rainbow
+    /// ledcontrol://on · off · toggle · color?hex=FF7A00 · brightness?value=40 · scene?name=Kino · flow?id=rainbow · goodnight
     func handle(url: URL) {
         guard url.scheme?.lowercased() == "ledcontrol" else { return }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -953,6 +951,8 @@ final class LightController {
             let name = (values["name"] ?? "").lowercased()
             guard let scene = scenes.first(where: { $0.name.lowercased() == name || $0.id.uuidString.lowercased() == name }) else { return nil }
             return { [weak self] in self?.applyScene(scene, t) }
+        case "goodnight", "gutenacht":
+            return { [weak self] in self?.startGoodnight(for: t) }
         case "flow", "effekt":
             guard let f = Flow.all.first(where: { $0.id == values["id"] }) else { return nil }
             return { [weak self] in self?.applyFlow(f, t, toggle: false) }
