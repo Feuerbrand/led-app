@@ -1,6 +1,6 @@
 Steuere deine Bluetooth-LED-Leisten direkt vom iPhone – schnell, schön und ohne Umwege.
 
-LED Controller verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü schimmert jedes Licht in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
+Lichtpilot verbindet sich von selbst mit deinen Lichtern. Im Hauptmenü schimmert jedes Licht in seiner Farbe – antippen und nur dieses Licht steuern, oder alle zusammen.
 
 FARBE ABFOTOGRAFIEREN
 • Kamera auf etwas halten – auf ein Kissen, ein Poster, ein Getränk – und dein Licht leuchtet live in genau dieser Farbe

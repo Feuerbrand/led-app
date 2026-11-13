@@ -1,1 +1,1 @@
-LED,strip,lights,RGB,Bluetooth,colour,color,camera,effects,music,lamp,ELK,BLEDOM,widget,controller
+controller,remote,rgb,bluetooth,light,lamp,color,colour,camera,music,effects,elk,bledom,widget,neon

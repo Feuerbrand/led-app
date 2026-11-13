@@ -1,1 +1,1 @@
-LED,Leiste,Lichtleiste,Strip,RGB,Bluetooth,Licht,Farbe,Kamera,Effekte,Musik,Lampe,ELK,BLEDOM,Widget
+fernbedienung,lichtleiste,rgb,bluetooth,licht,farbe,kamera,musik,lampe,elk,bledom,widget,beleuchtung

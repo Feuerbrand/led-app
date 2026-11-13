@@ -1,6 +1,6 @@
 Control your Bluetooth LED strips right from your iPhone – fast, beautiful and without detours.
 
-LED Controller connects to your lights by itself. On the home screen every light glows in its current colour – tap one to control just that light, or control all of them together.
+Lichtpilot connects to your lights by itself. On the home screen every light glows in its current colour – tap one to control just that light, or control all of them together.
 
 PICK A COLOUR WITH THE CAMERA
 • Point the camera at anything – a cushion, a poster, a drink – and your light glows live in exactly that colour
