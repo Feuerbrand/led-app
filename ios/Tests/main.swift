@@ -215,7 +215,7 @@ expect(model("Triones:ABCDEF") == "TRIONES", "Triones -> \(model("Triones:ABCDEF
 expect(model("SP110E") == "SP110E", "SP110E -> \(model("SP110E"))")
 expect(model("MELK-OA10   99") == "MELK-OA10", "MELK-OA10 mit Nummer -> \(model("MELK-OA10   99"))")
 for other in ["[LG] webOS TV OLED65C39LC", "P165 SkyQ EC201A", "LG DS75QR(B8)", "Hauptschlafzimmer",
-              "Eddystone", "AirPods Pro", "iPhone", "", "   ", "#GOVEE", "LEDBLE#ELK"] {
+              "Eddystone", "AirPods Pro", "iPhone", "", "   ", "#GOVEE", "#TRIONES"] {
     expect(model(other) == "-", "\(other) ist kein LED-Licht, erkannt als \(model(other))")
 }
 expect(LightModel.detect(nil, services: [Triones.service])?.prefix == "#TRIONES", "HappyLighting an FFD5 erkennen")
