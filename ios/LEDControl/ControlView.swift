@@ -194,6 +194,7 @@ private struct ControlHeader: View {
         if look.builtin != nil { return "Effekt in der Leiste" }
         if light.goodnight != nil { return "Gute Nacht" }
         if light.sunrise != nil { return "Sonnenaufgang" }
+        if look.picked != true { return "Eigene Farbe des Lichts" }
         return ColorName.of(look.base)
     }
 
@@ -696,10 +697,11 @@ private struct BuiltinGroup: View {
         let lights = light.lightsOf(target).filter { $0.state == .on }
         var list: [EffectFamily] = []
         if lights.contains(where: { $0.model.pixels == .addressable }) { list.append(.stripX) }
-        for family in EffectFamily.allCases where family != .stripX && lights.contains(where: { $0.model.family == family }) {
+        for family in EffectFamily.allCases where family != .stripX && !family.effects.isEmpty
+            && lights.contains(where: { $0.model.family == family }) {
             list.append(family)
         }
-        return list.isEmpty ? [.elk] : list
+        return lights.isEmpty ? [.elk] : list
     }
 
     var body: some View {
@@ -732,7 +734,12 @@ private struct BuiltinGroup: View {
             }
             .buttonStyle(.plain)
 
-            if open {
+            if open && all.isEmpty {
+                Text("Diese Lichter haben keine eingebauten Effekte, die die App starten kann. Die Effekte oben laufen trotzdem.")
+                    .font(.geist(13, 500))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.top, 16)
+            } else if open {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(all, id: \.self) { family in
                         if all.count > 1 {

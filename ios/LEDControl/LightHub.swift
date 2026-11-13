@@ -11,11 +11,12 @@ enum BluetoothState {
     case starting, ready, off, denied, unsupported
 }
 
-/// Ein Licht: die ELK-Leiste, ein MELK-Licht aus Lotus Lamp X oder ein weiteres Gerät derselben Familie.
+/// Ein LED-Licht: ELK-/MELK-Leiste, HappyLighting, SP110E oder Govee.
 @Observable
 final class Light: Identifiable {
     let id: UUID
-    let model: LightModel
+    /// Kann sich nach dem Verbinden noch ändern („LEDBLE“ gibt es in zwei Familien)
+    fileprivate(set) var model: LightModel
     fileprivate(set) var name: String
     /// Eigener Name, leer = Gerätename anzeigen
     fileprivate(set) var alias: String
@@ -31,10 +32,17 @@ final class Light: Identifiable {
     @ObservationIgnored fileprivate var writeChar: CBCharacteristic?
     @ObservationIgnored fileprivate var queue: SendQueue
     @ObservationIgnored fileprivate var pumping = false
-    @ObservationIgnored fileprivate var searchedAll = false
     @ObservationIgnored fileprivate var watchdog: DispatchWorkItem?
     /// Zählt bei jedem Verbindungswechsel hoch, damit eine alte Anmeldung nicht weiterläuft
     @ObservationIgnored fileprivate var session = 0
+    /// Gefundene Merkmale und noch ausstehende Dienste beim Verbinden
+    @ObservationIgnored fileprivate var chars: [CBCharacteristic] = []
+    @ObservationIgnored fileprivate var pendingServices = 0
+    /// Für Bauarten ohne eigenen Helligkeits- oder Tempo-Befehl (HappyLighting)
+    @ObservationIgnored fileprivate var level = 100
+    @ObservationIgnored fileprivate var speed = 50
+    @ObservationIgnored fileprivate var lastColor: RGB?
+    @ObservationIgnored fileprivate var lastEffect: UInt8?
 
     var title: String { alias.isEmpty ? name : alias }
 
@@ -45,7 +53,15 @@ final class Light: Identifiable {
         self.model = model
         self.saved = saved
         self.enabled = enabled
-        self.queue = SendQueue(encode: model.color)
+        self.queue = SendQueue()
+        self.queue = SendQueue(packets: { [unowned self] c in self.packets(for: c) })
+    }
+
+    /// Farbe in Pakete übersetzen; kann das Licht nicht selbst dimmen, wird die Farbe abgedunkelt
+    private func packets(for c: RGB) -> [[UInt8]] {
+        if model.nativeBrightness || level >= 100 { return model.colors(c) }
+        let k = Double(max(level, 0)) / 100
+        return model.colors(RGB(Int((Double(c.r) * k).rounded()), Int((Double(c.g) * k).rounded()), Int((Double(c.b) * k).rounded())))
     }
 }
 
@@ -56,8 +72,6 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// Erst die eigenen Lichter, dahinter die nur gefundenen
     private(set) var lights: [Light] = []
     private(set) var bluetooth: BluetoothState = .starting
-    /// Auch Bluetooth-Geräte mit fremdem Namen in der Liste zeigen
-    private(set) var showAll = false
     /// Es wurde schon einmal ein Licht hinzugefügt (dann wird nichts mehr automatisch übernommen)
     private(set) var setupDone = UserDefaults.standard.bool(forKey: "led-app.setup")
 
@@ -85,7 +99,8 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // MARK: - Was die Oberfläche fragt
 
     var mine: [Light] { lights.filter { $0.saved } }
-    var nearby: [Light] { lights.filter { !$0.saved && ($0.model.known || showAll) } }
+    /// Nur LED-Lichter, die die App kennt – nie andere Bluetooth-Geräte
+    var nearby: [Light] { lights.filter { !$0.saved && $0.model.known } }
     /// Lichter, die gerade Befehle bekommen
     var targets: [Light] { lights.filter { $0.state == .on } }
     var hasTargets: Bool { lights.contains { $0.state == .on } }
@@ -144,10 +159,6 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
-    }
-
-    func setShowAll(_ on: Bool) {
-        showAll = on
     }
 
     /// Gespeicherte eigene Lichter (Kennung und angezeigter Name), ohne Bluetooth zu starten – für Siri und Kurzbefehle
@@ -229,20 +240,47 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     func send(_ order: Order, to light: Light) {
         guard light.state == .on else { return }
-        light.queue.control(order.key, order.bytes(for: light.model))
+        switch order {
+        case .bright(let percent) where !light.model.nativeBrightness:
+            // Kein Helligkeits-Befehl: die letzte Farbe abgedunkelt neu schicken
+            light.level = percent
+            if let c = light.lastColor {
+                light.queue.forgetLast()
+                light.queue.color(c)
+            }
+            pump(light)
+            return
+        case .effect(let code):
+            light.lastEffect = code
+        case .speed(let percent):
+            light.speed = percent
+            if light.model.speed(percent).isEmpty {
+                // Tempo steckt im Effekt-Befehl: laufenden Effekt mit neuem Tempo neu starten
+                guard let code = light.lastEffect else { return }
+                let bytes = light.model.effect(code, speed: percent)
+                if bytes.isEmpty { return }
+                light.queue.control(Order.effect(code).key, bytes)
+                pump(light)
+                return
+            }
+        default:
+            break
+        }
+        let bytes = order.bytes(for: light.model, speed: light.speed)
+        if bytes.isEmpty { return }
+        light.queue.control(order.key, bytes)
         pump(light)
     }
 
     /// Farbe an alle verbundenen Lichter; je Licht wird nur die neueste geschickt
     func send(color: RGB) {
-        for light in targets {
-            light.queue.color(color)
-            pump(light)
-        }
+        for light in targets { send(color: color, to: light) }
     }
 
     func send(color: RGB, to light: Light) {
         guard light.state == .on else { return }
+        light.lastColor = color
+        light.lastEffect = nil
         light.queue.color(color)
         pump(light)
     }
@@ -314,10 +352,13 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             // Aus der ersten App-Version: eine einzelne gemerkte Leiste
             stored = [Stored(id: id, name: "ELK-BLEDOM", alias: "", enabled: true, model: LightModel.elk.prefix)]
         }
-        lights = stored.map { item -> Light in
+        lights = stored.compactMap { item -> Light? in
             let model = item.model.flatMap { LightModel.find(prefix: $0) } ?? LightModel.detect(item.name) ?? LightModel.generic
+            // Früher konnte man unter „Alle Bluetooth-Geräte zeigen“ auch andere Geräte aufnehmen – die fliegen raus
+            guard model.known else { return nil }
             return Light(id: item.id, name: item.name, alias: item.alias, model: model, saved: true, enabled: item.enabled)
         }
+        if lights.count != stored.count { persist() }
         if !lights.isEmpty && !setupDone {
             setupDone = true
             UserDefaults.standard.set(true, forKey: "led-app.setup")
@@ -373,7 +414,8 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     private func discover(_ light: Light, _ p: CBPeripheral) {
-        light.searchedAll = false
+        light.chars = []
+        light.pendingServices = 0
         light.watchdog?.cancel()
         // Frist, um Dienst und Merkmal zu finden; sonst trennen und neu verbinden
         let item = DispatchWorkItem { [weak self, weak light] in
@@ -382,7 +424,46 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
         light.watchdog = item
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: item)
-        p.discoverServices([Command.service])
+        p.discoverServices(nil)        // alle Dienste: manche Nachbauten haben die Schnittstelle woanders
+    }
+
+    /// Alle Merkmale sind da: das passende Schreib-Merkmal wählen
+    private func chooseWriter(_ light: Light, _ p: CBPeripheral) {
+        let has = { (uuid: CBUUID) in light.chars.contains { $0.uuid == uuid } }
+        // „LEDBLE“ ohne FFD9 ist ein ELK-Nachbau
+        if light.model.wire == .triones && !has(Triones.characteristic)
+            && (has(Command.characteristic) || has(SP.characteristic)) {
+            light.model = LightModel.ledbleElk
+            if light.saved { persist() }
+        }
+        let char = light.model.wire.writeChars.lazy
+            .compactMap { uuid in light.chars.first { $0.uuid == uuid } }
+            .first
+        guard let char else {
+            onLog("\(light.title): passende Schnittstelle nicht gefunden – neuer Versuch …")
+            return                              // der Wächter trennt und verbindet neu
+        }
+        light.writeChar = char
+        light.watchdog?.cancel()
+        light.watchdog = nil
+        if light.model.wire == .govee, let info = light.chars.first(where: { $0.uuid == Govee.cipherInfo }),
+           info.properties.contains(.read) {
+            p.readValue(for: info)
+        }
+        login(light)
+    }
+
+    /// Govee trennt ohne Lebenszeichen nach wenigen Sekunden
+    private func keepAlive(_ light: Light) {
+        guard light.model.wire == .govee else { return }
+        let session = light.session
+        Task { @MainActor [weak self, weak light] in
+            while true {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, let light, light.session == session, light.state == .on else { return }
+                self.write(Govee.keepAlive, to: light)
+            }
+        }
     }
 
     /// Schreib-Merkmal gefunden: bei MELK erst anmelden, dann ist das Licht bereit
@@ -410,6 +491,7 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         light.queue.forgetLast()
         light.state = .on
         onLog("Verbunden mit \(light.title) ✓")
+        keepAlive(light)
         onReady(light)
     }
 
@@ -455,12 +537,12 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// Lichter, die iOS gerade schon verbunden hält (etwa durch Lotus Lamp X), senden keinen Namen mehr aus
     private func adoptConnected() {
         guard let central, central.state == .poweredOn else { return }
-        for p in central.retrieveConnectedPeripherals(withServices: [Command.service]) {
+        for p in central.retrieveConnectedPeripherals(withServices: Wire.allServices) {
             found(p, name: p.name, rssi: nil)
         }
     }
 
-    private func found(_ p: CBPeripheral, name: String?, rssi: Int?) {
+    private func found(_ p: CBPeripheral, name: String?, rssi: Int?, services: [CBUUID] = []) {
         if let light = entry(for: p) {
             if let rssi { light.rssi = rssi } else if light.rssi == nil { light.rssi = -60 }
             if let name, !name.isEmpty, light.name != name {
@@ -474,13 +556,14 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             }
             return
         }
-        guard let name, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let model = LightModel.detect(name) ?? LightModel.generic
-        let light = Light(id: p.identifier, name: name, alias: "", model: model, saved: false, enabled: false)
+        // Nur LED-Lichter, die die App steuern kann. Handys, Fernseher, Kopfhörer usw. erscheinen nie.
+        guard let model = LightModel.detect(name, services: services) else { return }
+        let shown = name.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 } ?? model.label
+        let light = Light(id: p.identifier, name: shown, alias: "", model: model, saved: false, enabled: false)
         light.peripheral = p
         light.rssi = rssi ?? -60
         lights.append(light)
-        if model.known { onLog("Licht gefunden: \(name)") }
+        onLog("Licht gefunden: \(shown)")
         // Allererster Start: die eigene ELK-Leiste ohne Nachfrage übernehmen. Andere Lichter
         // (MELK …) erscheinen nur in der Liste und werden erst nach „Hinzufügen“ verbunden.
         if !setupDone && model.autoAdopt { add(light) }
@@ -531,7 +614,8 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     func centralManager(_ central: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
         let adName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        found(p, name: adName ?? p.name, rssi: RSSI.intValue)
+        let services = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? []
+        found(p, name: adName ?? p.name, rssi: RSSI.intValue, services: services)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect p: CBPeripheral) {
@@ -553,30 +637,28 @@ final class LightHub: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // MARK: - CBPeripheralDelegate
 
     func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let light = entry(for: p), light.peripheral === p else { return }
+        guard let light = entry(for: p), light.peripheral === p, light.writeChar == nil else { return }
         let services = p.services ?? []
-        let wanted = services.filter { $0.uuid == Command.service }
-        if wanted.isEmpty && !light.searchedAll {
-            // Manche Nachbauten melden FFF0 nur in der vollen Liste
-            light.searchedAll = true
-            p.discoverServices(nil)
-            return
+        light.chars = []
+        light.pendingServices = services.count
+        if services.isEmpty {
+            onLog("\(light.title): keine Dienste gefunden – neuer Versuch …")
+            return                              // der Wächter trennt und verbindet neu
         }
-        if wanted.isEmpty {
-            onLog("\(light.title): Dienst FFF0 nicht gefunden – suche das Schreib-Merkmal FFF3 in allen Diensten.")
-        }
-        for s in (wanted.isEmpty ? services : wanted) {
-            p.discoverCharacteristics([Command.characteristic], for: s)
-        }
+        for s in services { p.discoverCharacteristics(nil, for: s) }
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let light = entry(for: p), light.peripheral === p, light.writeChar == nil,
-              let c = service.characteristics?.first(where: { $0.uuid == Command.characteristic }) else { return }
-        light.writeChar = c
-        light.watchdog?.cancel()
-        light.watchdog = nil
-        login(light)
+        guard let light = entry(for: p), light.peripheral === p, light.writeChar == nil, light.pendingServices > 0 else { return }
+        light.chars += service.characteristics ?? []
+        light.pendingServices -= 1
+        if light.pendingServices == 0 { chooseWriter(light, p) }
+    }
+
+    func peripheral(_ p: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard characteristic.uuid == Govee.cipherInfo, let light = entry(for: p),
+              let first = characteristic.value?.first, first != 0 else { return }
+        onLog("\(light.title) ist ein neueres Govee-Modell mit Verschlüsselung – das kann die App noch nicht steuern.")
     }
 
     func peripheral(_ p: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {

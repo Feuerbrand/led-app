@@ -26,6 +26,91 @@ enum Command {
     }
 }
 
+/// Schnittstelle und Byte-Format einer Bauart
+enum Wire: String {
+    case elk, triones, sp110e, sp107e, govee
+
+    var services: [CBUUID] {
+        switch self {
+        case .elk: return [Command.service]
+        case .triones: return [Triones.service]
+        case .sp110e, .sp107e: return [SP.service]
+        case .govee: return [Govee.service]
+        }
+    }
+
+    /// Mögliche Schreib-Merkmale, das erste vorhandene gewinnt
+    var writeChars: [CBUUID] {
+        switch self {
+        case .elk: return [Command.characteristic, SP.characteristic]     // LEDBLE-Nachbauten: 7E-Befehle auf FFE1
+        case .triones: return [Triones.characteristic]
+        case .sp110e, .sp107e: return [SP.characteristic]
+        case .govee: return [Govee.characteristic]
+        }
+    }
+
+    static let allServices: [CBUUID] = [Command.service, Triones.service, SP.service, Govee.service]
+}
+
+/// HappyLighting / Triones (QHM-…, LEDBlue, Triones, Dream~). Quellen: madhead/saberlight, Bluetooth-Devices/led-ble.
+enum Triones {
+    static let service = CBUUID(string: "FFD5")
+    static let characteristic = CBUUID(string: "FFD9")
+    static let on: [UInt8] = [0xcc, 0x23, 0x33]
+    static let off: [UInt8] = [0xcc, 0x24, 0x33]
+
+    static func color(_ c: RGB) -> [UInt8] {
+        [0x56, UInt8(clamping: c.r), UInt8(clamping: c.g), UInt8(clamping: c.b), 0x00, 0xf0, 0xaa]
+    }
+
+    /// Tempo 0…100 % -> Pause 31 (langsam) … 1 (schnell), wie flux_led
+    static func delay(_ percent: Int) -> UInt8 {
+        let p = Double(min(max(percent, 0), 100))
+        return UInt8(max(1, min(31, Int((31 - p * 30 / 100).rounded()))))
+    }
+}
+
+/// SP110E / SP107E: 4 Bytes, drei Werte und am Ende der Befehl. Quellen: roslovets/SP110E, monty68/uniled.
+enum SP {
+    static let service = CBUUID(string: "FFE0")
+    static let characteristic = CBUUID(string: "FFE1")
+
+    static func frame(_ a: Int, _ b: Int, _ c: Int, _ cmd: UInt8) -> [UInt8] {
+        [UInt8(clamping: a), UInt8(clamping: b), UInt8(clamping: c), cmd]
+    }
+}
+
+/// Govee H6xxx: 20 Bytes, 0x33 + Befehl, am Ende XOR-Prüfsumme. Ohne Lebenszeichen alle 2 s trennt das Licht.
+/// Quellen: egold555/Govee-Reverse-Engineering, Beshelmek/govee_ble_lights, Mezzle/govee-bluetooth.
+enum Govee {
+    static let service = CBUUID(string: "00010203-0405-0607-0809-0A0B0C0D1910")
+    static let characteristic = CBUUID(string: "00010203-0405-0607-0809-0A0B0C0D2B11")
+    /// Erstes Byte: 0 = unverschlüsselt. Neuere Modelle verschlüsseln, die kann die App nicht steuern.
+    static let cipherInfo = CBUUID(string: "00010203-0405-0607-0809-0A0B0C0D2B12")
+
+    static func frame(_ head: UInt8, _ body: [UInt8]) -> [UInt8] {
+        var bytes = [head] + body.prefix(18)
+        bytes += Array(repeating: 0, count: 19 - bytes.count)
+        bytes.append(bytes.reduce(0, ^))
+        return bytes
+    }
+
+    static func command(_ body: [UInt8]) -> [UInt8] { frame(0x33, body) }
+
+    static let keepAlive = frame(0xaa, [0x01])
+
+    /// Je nach Modell versteht ein Govee-Licht eine andere Farb-Form: alle Segmente (RGBIC),
+    /// 0x0D oder die alte „manuelle“ Form. Alle drei tragen dieselbe Farbe, die passende greift.
+    static func colors(_ c: RGB) -> [[UInt8]] {
+        let r = UInt8(clamping: c.r), g = UInt8(clamping: c.g), b = UInt8(clamping: c.b)
+        return [
+            command([0x05, 0x15, 0x01, r, g, b, 0, 0, 0, 0, 0, 0xff, 0x7f]),
+            command([0x05, 0x0d, r, g, b]),
+            command([0x05, 0x02, r, g, b]),
+        ]
+    }
+}
+
 /// Fest eingebauter Effekt eines Lichts (läuft im Licht selbst, auch ohne App).
 struct BuiltinEffect: Identifiable {
     let name: String
@@ -48,7 +133,7 @@ struct BuiltinEffect: Identifiable {
 /// Welche eingebauten Effekte ein Licht kennt. Die Nummern unterscheiden sich je nach Bauart,
 /// deshalb geht ein eingebauter Effekt immer nur an die Lichter derselben Bauart.
 enum EffectFamily: String, CaseIterable {
-    case elk, melk, melkOx, stripX
+    case elk, melk, melkOx, stripX, triones, sp, govee
 
     var title: String {
         switch self {
@@ -56,11 +141,38 @@ enum EffectFamily: String, CaseIterable {
         case .melk: return "Eingebaut: MELK-Licht"
         case .melkOx: return "Eingebaut: MELK-Licht"
         case .stripX: return "Lauflichter (eingebaut)"
+        case .triones: return "Eingebaut: HappyLighting-Leiste"
+        case .sp: return "Eingebaut: SP-Leiste"
+        case .govee: return "Govee"
         }
     }
 
     var effects: [BuiltinEffect] {
         switch self {
+        case .govee:
+            return []                       // Govee-Szenen laufen über die Govee-App, nicht über diese Befehle
+        case .sp:
+            return (1...12).map { BuiltinEffect(name: "Muster \($0)", code: UInt8($0)) }
+        case .triones:
+            return [
+                BuiltinEffect(name: "Alle Farben überblenden", code: 0x25),
+                BuiltinEffect(name: "Rot pulsieren", code: 0x26),
+                BuiltinEffect(name: "Grün pulsieren", code: 0x27),
+                BuiltinEffect(name: "Blau pulsieren", code: 0x28),
+                BuiltinEffect(name: "Gelb pulsieren", code: 0x29),
+                BuiltinEffect(name: "Türkis pulsieren", code: 0x2a),
+                BuiltinEffect(name: "Lila pulsieren", code: 0x2b),
+                BuiltinEffect(name: "Weiß pulsieren", code: 0x2c),
+                BuiltinEffect(name: "Rot-Grün", code: 0x2d),
+                BuiltinEffect(name: "Rot-Blau", code: 0x2e),
+                BuiltinEffect(name: "Grün-Blau", code: 0x2f),
+                BuiltinEffect(name: "Alle Farben blitzen", code: 0x30),
+                BuiltinEffect(name: "Rot blitzen", code: 0x31),
+                BuiltinEffect(name: "Grün blitzen", code: 0x32),
+                BuiltinEffect(name: "Blau blitzen", code: 0x33),
+                BuiltinEffect(name: "Weiß blitzen", code: 0x37),
+                BuiltinEffect(name: "Farben springen", code: 0x38),
+            ]
         case .elk:
             return BuiltinEffect.all
         case .melk:
@@ -157,6 +269,8 @@ struct LightModel {
     let login: [[UInt8]]
     /// Nur die eigene ELK-Leiste wird beim allerersten Start ohne Nachfrage übernommen
     let autoAdopt: Bool
+    /// Schnittstelle und Byte-Format
+    var wire: Wire = .elk
 
     /// false = Gerät mit unbekanntem Namen, die App versucht es mit den ELK-Befehlen
     var known: Bool { !prefix.isEmpty }
@@ -165,18 +279,60 @@ struct LightModel {
     var pixels: PixelKind {
         switch family {
         case .stripX: return .addressable
-        case .elk: return .singleColor
-        case .melk, .melkOx: return .unknown
+        case .elk, .triones: return .singleColor
+        case .melk, .melkOx, .sp, .govee: return .unknown
         }
     }
 
-    func color(_ c: RGB) -> [UInt8] {
-        Command.color(c)                    // bei allen unterstützten Bauarten gleich
+    /// Kann das Licht selbst dimmen? Sonst rechnet die App die Helligkeit in die Farbe ein.
+    var nativeBrightness: Bool { wire != .triones }
+
+    /// Erstes Farbpaket (Govee bekommt mehrere, siehe `colors`)
+    func color(_ c: RGB) -> [UInt8] { colors(c)[0] }
+
+    /// Alle Pakete für eine Farbe
+    func colors(_ c: RGB) -> [[UInt8]] {
+        switch wire {
+        case .elk: return [Command.color(c)]
+        case .triones: return [Triones.color(c)]
+        case .sp110e: return [SP.frame(c.r, c.g, c.b, 0x1e)]
+        case .sp107e: return [SP.frame(c.r, c.g, c.b, 0x0c)]
+        case .govee: return Govee.colors(c)
+        }
     }
 
-    func bright(_ percent: Int) -> [UInt8] { fill(brightTemplate, percent) }
-    func effect(_ code: UInt8) -> [UInt8] { fill(effectTemplate, Int(code)) }
-    func speed(_ percent: Int) -> [UInt8] { fill(speedTemplate, percent) }
+    /// Leer = das Licht hat dafür keinen eigenen Befehl
+    func bright(_ percent: Int) -> [UInt8] {
+        switch wire {
+        case .elk: return fill(brightTemplate, percent)
+        case .triones: return []
+        case .sp110e: return SP.frame(clamp(percent) * 255 / 100, 0, 0, 0x2a)
+        case .sp107e: return SP.frame(clamp(percent) * 255 / 100, 0, 0, 0x0a)
+        case .govee: return Govee.command([0x04, UInt8(max(clamp(percent), 1))])   // 1…100: 255 trennt manche Modelle
+        }
+    }
+
+    func effect(_ code: UInt8, speed: Int = 50) -> [UInt8] {
+        switch wire {
+        case .elk: return fill(effectTemplate, Int(code))
+        case .triones: return [0xbb, code, Triones.delay(speed), 0x44]
+        case .sp110e: return SP.frame(Int(code), 0, 0, 0x2c)
+        case .sp107e: return SP.frame(Int(code), 0, 0, 0x08)
+        case .govee: return []
+        }
+    }
+
+    /// Leer bei HappyLighting: dort steckt das Tempo im Effekt-Befehl
+    func speed(_ percent: Int) -> [UInt8] {
+        switch wire {
+        case .elk: return fill(speedTemplate, percent)
+        case .triones, .govee: return []
+        case .sp110e: return SP.frame(max(1, clamp(percent) * 186 / 100), 0, 0, 0x03)
+        case .sp107e: return SP.frame(max(1, clamp(percent) * 255 / 100), 0, 0, 0x09)
+        }
+    }
+
+    private func clamp(_ percent: Int) -> Int { min(max(percent, 0), 100) }
 
     private func fill(_ template: [UInt8], _ value: Int) -> [UInt8] {
         var bytes = template
@@ -222,9 +378,60 @@ struct LightModel {
     private static let brightA: [UInt8] = [0x7e, 0x04, 0x01, 0x00, 0x01, 0xff, 0xff, 0x00, 0xef]
     private static let brightB: [UInt8] = [0x7e, 0x04, 0x01, 0x00, 0xff, 0x00, 0xff, 0x00, 0xef]
 
+    private static func elkLike(_ prefix: String) -> LightModel {
+        LightModel(prefix: prefix, label: "LED-Leiste", family: .elk,
+                   on: Command.on, off: Command.off,
+                   brightTemplate: Command.bright(0), effectTemplate: Command.effect(0), speedTemplate: Command.speed(0),
+                   login: [], autoAdopt: false)
+    }
+
+    private static func triones(_ prefix: String) -> LightModel {
+        LightModel(prefix: prefix, label: "HappyLighting-Leiste", family: .triones,
+                   on: Triones.on, off: Triones.off,
+                   brightTemplate: [], effectTemplate: [], speedTemplate: [],
+                   login: [], autoAdopt: false, wire: .triones)
+    }
+
+    private static func govee(_ prefix: String) -> LightModel {
+        LightModel(prefix: prefix, label: "Govee-Licht", family: .govee,
+                   on: Govee.command([0x01, 0x01]), off: Govee.command([0x01, 0x00]),
+                   brightTemplate: [], effectTemplate: [], speedTemplate: [],
+                   login: [], autoAdopt: false, wire: .govee)
+    }
+
+    /// „LEDBLE“ benutzen zwei Familien. Hat das Gerät kein FFD9, spricht es die ELK-Befehle.
+    static let ledbleElk = elkLike("LEDBLE#ELK")
+    /// Ohne bekannten Namen, aber an der Schnittstelle der Familie erkannt
+    static let trionesByService = triones("#TRIONES")
+    static let goveeByService = govee("#GOVEE")
+
     static let all: [LightModel] = [
         elk,
         elkOther,
+        elkLike("XROCKER"),
+        elkLike("JACKYLED"),
+        elkLike("DMRRBA"),
+        ledbleElk,
+        triones("TRIONES"),
+        triones("LEDBLUE"),
+        triones("LEDBLE"),
+        triones("QHM-"),
+        triones("BLE-LED"),
+        triones("DREAM~"),
+        trionesByService,
+        LightModel(prefix: "SP110E", label: "SP110E-Leiste", family: .sp,
+                   on: SP.frame(0, 0, 0, 0xaa), off: SP.frame(0, 0, 0, 0xab),
+                   brightTemplate: [], effectTemplate: [], speedTemplate: [],
+                   login: [], autoAdopt: false, wire: .sp110e),
+        LightModel(prefix: "SP107E", label: "SP107E-Leiste", family: .sp,
+                   on: SP.frame(0, 0, 0, 0xaa), off: SP.frame(0, 0, 0, 0xbb),
+                   brightTemplate: [], effectTemplate: [], speedTemplate: [],
+                   login: [], autoAdopt: false, wire: .sp107e),
+        govee("GOVEE_"),
+        govee("IHOMENT_"),
+        govee("GBK_"),
+        govee("MINGER_"),
+        goveeByService,
         melk("MELK-OG10", .melkOx,
              on: [0x7e, 0x07, 0x04, 0xff, 0x00, 0x01, 0x02, 0x01, 0xef],
              off: [0x7e, 0x07, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0xef],
@@ -246,13 +453,18 @@ struct LightModel {
     }
 
     /// Bauart zum Gerätenamen. Passen mehrere, gewinnt der längste Anfang (MELK-OA10 vor MELK).
-    static func detect(_ name: String?) -> LightModel? {
-        let upper = (name ?? "").uppercased()
+    /// Ohne passenden Namen zählt eine Schnittstelle, die nur LED-Controller haben (FFD5, Govee).
+    /// Alles andere ist kein Licht und erscheint nirgends.
+    static func detect(_ name: String?, services: [CBUUID] = []) -> LightModel? {
+        let upper = (name ?? "").trimmingCharacters(in: .whitespaces).uppercased()
         var best: LightModel?
-        for model in all where upper.hasPrefix(model.prefix) {
+        for model in all where !upper.isEmpty && !model.prefix.contains("#") && upper.hasPrefix(model.prefix) {
             if best == nil || model.prefix.count > (best?.prefix.count ?? 0) { best = model }
         }
-        return best
+        if let best { return best }
+        if services.contains(Triones.service) { return trionesByService }
+        if services.contains(Govee.service) { return goveeByService }
+        return nil
     }
 }
 
@@ -273,11 +485,12 @@ enum Order {
         }
     }
 
-    func bytes(for model: LightModel) -> [UInt8] {
+    /// Leer = diese Bauart hat dafür keinen eigenen Befehl
+    func bytes(for model: LightModel, speed: Int = 50) -> [UInt8] {
         switch self {
         case .power(let on): return on ? model.on : model.off
         case .bright(let percent): return model.bright(percent)
-        case .effect(let code): return model.effect(code)
+        case .effect(let code): return model.effect(code, speed: speed)
         case .speed(let percent): return model.speed(percent)
         }
     }

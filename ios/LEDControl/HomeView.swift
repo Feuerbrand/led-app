@@ -188,6 +188,7 @@ private struct LightRow: View {
         if look.builtin != nil { return "Effekt" + percent }
         if light.goodnight != nil { return "Gute Nacht" + percent }
         if light.sunrise != nil { return "Sonnenaufgang" }
+        if look.picked != true { return "An" + percent }
         return ColorName.of(look.base) + percent
     }
 

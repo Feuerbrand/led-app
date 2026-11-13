@@ -2,6 +2,7 @@
 // Die Soll-Werte in expected.json erzeugt make-expected.mjs mit dem echten Code der Webseite.
 // Läuft im Build-Workflow auf dem Mac:  check Tests/expected.json
 import Foundation
+import CoreBluetooth
 
 struct Expected: Decodable {
     struct HSV: Decodable { let h, s, v: Double; let out: [Int] }
@@ -145,7 +146,7 @@ expect(model("MELK-OA10") == "MELK-OA10", "MELK-OA10 -> \(model("MELK-OA10"))")
 expect(model("melk-og10 ") == "MELK-OG10", "melk-og10 -> \(model("melk-og10 "))")
 expect(model("MELK-OA21") == "MELK-OA21", "MELK-OA21 -> \(model("MELK-OA21"))")
 expect(model("MELK-XYZ") == "MELK", "MELK-XYZ -> \(model("MELK-XYZ"))")
-expect(model("LEDBLE-1234") == "-", "LEDBLE darf nicht erkannt werden")
+expect(model("LEDBLE-1234") == "LEDBLE", "LEDBLE -> \(model("LEDBLE-1234"))")
 expect(model(nil) == "-", "Gerät ohne Namen darf nicht erkannt werden")
 expect(LightModel.detect("ELK-BLEDDM")?.autoAdopt == true, "ELK-Leiste muss automatisch übernommen werden")
 for name in ["MELK-OA10", "MELK", "ELK-BULB", "MELK-OG10"] {
@@ -200,10 +201,69 @@ for c in melkCases {
 expect(LightModel.elk.login.isEmpty, "ELK-Leiste braucht keine Anmeldung")
 
 // Jede Bauart hat Effekte mit eindeutigen Nummern
-for family in EffectFamily.allCases {
+for family in EffectFamily.allCases where family != .govee {
     let codes = family.effects.map { $0.code }
     expect(!codes.isEmpty && Set(codes).count == codes.count, "Effekte \(family) doppelt oder leer")
 }
+
+// Nur LED-Lichter: alles andere aus dem Bluetooth-Scan wird nie erkannt
+expect(model("Govee_H618A_3373") == "GOVEE_", "Govee H618A -> \(model("Govee_H618A_3373"))")
+expect(model("Govee_H6056_4C21") == "GOVEE_", "Govee H6056 -> \(model("Govee_H6056_4C21"))")
+expect(model("ihoment_H6199_ABCD") == "IHOMENT_", "ihoment -> \(model("ihoment_H6199_ABCD"))")
+expect(model("QHM-0A1B") == "QHM-", "QHM -> \(model("QHM-0A1B"))")
+expect(model("Triones:ABCDEF") == "TRIONES", "Triones -> \(model("Triones:ABCDEF"))")
+expect(model("SP110E") == "SP110E", "SP110E -> \(model("SP110E"))")
+expect(model("MELK-OA10   99") == "MELK-OA10", "MELK-OA10 mit Nummer -> \(model("MELK-OA10   99"))")
+for other in ["[LG] webOS TV OLED65C39LC", "P165 SkyQ EC201A", "LG DS75QR(B8)", "Hauptschlafzimmer",
+              "Eddystone", "AirPods Pro", "iPhone", "", "   ", "#GOVEE", "LEDBLE#ELK"] {
+    expect(model(other) == "-", "\(other) ist kein LED-Licht, erkannt als \(model(other))")
+}
+expect(LightModel.detect(nil, services: [Triones.service])?.prefix == "#TRIONES", "HappyLighting an FFD5 erkennen")
+expect(LightModel.detect(nil, services: [Govee.service])?.prefix == "#GOVEE", "Govee am Dienst erkennen")
+expect(LightModel.detect(nil, services: [CBUUID(string: "FFF0"), CBUUID(string: "FFE0")]) == nil,
+       "allgemeine Dienste FFF0/FFE0 allein sind kein Hinweis auf ein Licht")
+expect(LightModel.detect("Govee_H618A_3373")?.autoAdopt == false, "Govee nie automatisch übernehmen")
+
+// Govee: 20 Bytes, XOR-Prüfsumme (Werte aus egold555/Govee-Reverse-Engineering)
+func hex(_ text: String) -> [UInt8] {
+    stride(from: 0, to: text.count, by: 2).map { i in
+        let a = text.index(text.startIndex, offsetBy: i)
+        return UInt8(text[a..<text.index(a, offsetBy: 2)], radix: 16)!
+    }
+}
+let govee = LightModel.detect("Govee_H618A_3373")!
+expect(govee.on == hex("3301010000000000000000000000000000000033"), "Govee an \(govee.on)")
+expect(govee.off == hex("3301000000000000000000000000000000000032"), "Govee aus \(govee.off)")
+expect(Govee.keepAlive == hex("aa010000000000000000000000000000000000ab"), "Govee Lebenszeichen")
+expect(govee.bright(100) == Govee.command([0x04, 100]) && govee.bright(0) == Govee.command([0x04, 1]), "Govee Helligkeit 1…100")
+let gc = govee.colors(RGB(255, 10, 0))
+expect(gc.count == 3 && gc.allSatisfy { $0.count == 20 && $0.prefix(19).reduce(0, ^) == $0[19] }, "Govee Farbpakete")
+expect(Array(gc[0].prefix(15)) == [0x33, 0x05, 0x15, 0x01, 255, 10, 0, 0, 0, 0, 0, 0, 0xff, 0x7f, 0], "Govee Farbe RGBIC \(gc[0])")
+expect(Array(gc[2].prefix(6)) == [0x33, 0x05, 0x02, 255, 10, 0], "Govee Farbe manuell \(gc[2])")
+expect(govee.effect(3).isEmpty && govee.speed(50).isEmpty, "Govee ohne eingebaute Effekte")
+
+// HappyLighting / Triones
+let tri = LightModel.detect("QHM-0A1B")!
+expect(tri.on == [0xcc, 0x23, 0x33] && tri.off == [0xcc, 0x24, 0x33], "Triones an/aus")
+expect(tri.color(RGB(1, 2, 3)) == [0x56, 1, 2, 3, 0x00, 0xf0, 0xaa], "Triones Farbe")
+expect(tri.effect(0x25, speed: 100) == [0xbb, 0x25, 1, 0x44] && tri.effect(0x25, speed: 0) == [0xbb, 0x25, 31, 0x44], "Triones Effekt + Tempo")
+expect(!tri.nativeBrightness && tri.bright(50).isEmpty && tri.speed(50).isEmpty, "Triones: Helligkeit über die Farbe")
+
+// SP110E
+let sp = LightModel.detect("SP110E")!
+expect(sp.on == [0, 0, 0, 0xaa] && sp.off == [0, 0, 0, 0xab], "SP110E an/aus")
+expect(sp.color(RGB(9, 8, 7)) == [9, 8, 7, 0x1e] && sp.bright(100) == [255, 0, 0, 0x2a] && sp.effect(5) == [5, 0, 0, 0x2c], "SP110E Befehle")
+
+// Jede Bauart findet sich über ihre gespeicherte Kennung wieder und hat eine Schnittstelle
+for m in LightModel.all {
+    expect(!m.wire.writeChars.isEmpty && !m.colors(RGB(1, 1, 1)).isEmpty, "\(m.prefix) ohne Schnittstelle")
+}
+expect(Set(LightModel.all.map { $0.prefix }).count == LightModel.all.count, "Kennungen doppelt")
+
+// Farbe aus mehreren Paketen (Govee): alle Pakete kommen nacheinander
+var multi = SendQueue(packets: { c in [[1, UInt8(c.r)], [2, UInt8(c.r)]] })
+multi.color(RGB(5, 0, 0))
+expect(multi.next() == [1, 5] && multi.next() == [2, 5] && multi.next() == nil && multi.isEmpty, "mehrere Pakete je Farbe")
 
 // Warteschlange mit eigener Farb-Übersetzung je Licht
 var custom = SendQueue(encode: { c in [0xaa, UInt8(c.r)] })

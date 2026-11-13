@@ -93,7 +93,7 @@ private struct ListStep: View {
                                         .lineLimit(1)
                                     HStack(spacing: 8) {
                                         PixelBadge(kind: item.model.pixels)
-                                        Text((item.model.known ? item.model.label : "Unbekannt – Versuch mit ELK-Befehlen").uppercased())
+                                        Text(item.model.label.uppercased())
                                             .font(.geistMono(10, 500))
                                             .tracking(0.8)
                                             .foregroundStyle(Theme.muted)
@@ -116,20 +116,6 @@ private struct ListStep: View {
                 }
                 .animation(.snappy, value: found.map { $0.id })
             }
-
-            Toggle(isOn: Binding(get: { hub.showAll }, set: { hub.setShowAll($0) })) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Auch andere Bluetooth-Geräte zeigen")
-                        .font(.geist(14, 500))
-                        .foregroundStyle(Theme.text)
-                    Text("Nur für Lichter mit anderem Namen. Die App versucht es dann mit den Befehlen der ELK-Leiste.")
-                        .font(.geist(12, 400))
-                        .foregroundStyle(Theme.muted)
-                }
-            }
-            .tint(Theme.accent)
-            .tile()
-            .padding(.top, 18)
         }
     }
 }

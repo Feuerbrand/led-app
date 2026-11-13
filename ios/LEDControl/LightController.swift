@@ -20,6 +20,9 @@ struct LightLook: Codable, Equatable {
     var flowID: String? = nil
     var builtin: UInt8? = nil
     var builtinFamily: String? = nil
+    /// Eine Farbe wurde in der App gewählt. Vorher zeigt das Licht seine eigene Farbe
+    /// (etwa von der Fernbedienung), die die App nicht kennt – dann nennt sie keine Farbe.
+    var picked: Bool? = nil
 
     /// Zuletzt gewählte feste Farbe (Grundfarbe für „Atmen“)
     var base: RGB {
@@ -28,8 +31,12 @@ struct LightLook: Codable, Equatable {
             red = newValue.r
             green = newValue.g
             blue = newValue.b
+            picked = true
         }
     }
+
+    /// Farbe, solange in der App noch keine gewählt wurde: neutrales Warmweiß statt eines erfundenen Rots
+    static let unknownGlow = RGB(255, 214, 170)
 
     var family: EffectFamily? { builtinFamily.flatMap { EffectFamily(rawValue: $0) } }
 }
@@ -103,7 +110,7 @@ final class LightController {
     }
 
     func glow(_ t: Target) -> RGB {
-        glows[key(t)] ?? lookOf(t).base
+        glows[key(t)] ?? (lookOf(t).picked == true ? lookOf(t).base : LightLook.unknownGlow)
     }
 
     func title(_ t: Target) -> String {
@@ -297,7 +304,7 @@ final class LightController {
                 hub.send(.bright(look.brightness), to: light)
                 if let code = look.builtin, look.family == light.model.family {
                     hub.send(.effect(code), to: light)
-                } else if owner[light.id] == nil {
+                } else if owner[light.id] == nil, look.picked == true || cur[light.id] != nil {
                     hub.send(color: cur[light.id] ?? look.base, to: light)
                 }
                 // Ein laufender Effekt erreicht das Licht von selbst mit dem nächsten Farbwert

@@ -181,7 +181,6 @@ struct ManageLightsPage: View {
             SectionTitle("Erweitert").rise(2)
             VStack(spacing: 12) {
                 DemoTile()
-                ShowAllTile()
             }
             .rise(3)
         }
@@ -358,26 +357,6 @@ private struct DemoTile: View {
             }
             .tint(Theme.accent)
             Text("Die App lässt sich dann ohne Licht bedienen, zum Ausprobieren oder Vorführen. Verbundene Lichter steuert sie trotzdem mit.")
-                .font(.geist(12, 400))
-                .foregroundStyle(Theme.muted)
-        }
-        .tile()
-    }
-}
-
-private struct ShowAllTile: View {
-    @Environment(LightController.self) private var light
-
-    var body: some View {
-        let hub = light.hub
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: Binding(get: { hub.showAll }, set: { hub.setShowAll($0) })) {
-                Text("Alle Bluetooth-Geräte zeigen")
-                    .font(.geist(15, 500))
-                    .foregroundStyle(Theme.text)
-            }
-            .tint(Theme.accent)
-            Text("Beim Hinzufügen auch Geräte mit fremdem Namen anzeigen. Die App versucht es dann mit den Befehlen der ELK-Leiste – das klappt nicht bei jedem Gerät.")
                 .font(.geist(12, 400))
                 .foregroundStyle(Theme.muted)
         }

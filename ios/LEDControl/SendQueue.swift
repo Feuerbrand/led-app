@@ -7,14 +7,20 @@ struct SendQueue {
     private var ctrl: [(key: String, bytes: [UInt8])] = []
     private var frame: RGB?
     private var lastSent: RGB?
-    /// Übersetzt eine Farbe in die Bytes des jeweiligen Lichts
-    private let encode: (RGB) -> [UInt8]
+    /// Restliche Pakete einer Farbe, die aus mehreren Paketen besteht (Govee)
+    private var rest: [[UInt8]] = []
+    /// Übersetzt eine Farbe in die Pakete des jeweiligen Lichts
+    private let encode: (RGB) -> [[UInt8]]
 
     init(encode: @escaping (RGB) -> [UInt8] = Command.color) {
-        self.encode = encode
+        self.encode = { [encode($0)] }
     }
 
-    var isEmpty: Bool { ctrl.isEmpty && frame == nil }
+    init(packets: @escaping (RGB) -> [[UInt8]]) {
+        self.encode = packets
+    }
+
+    var isEmpty: Bool { ctrl.isEmpty && frame == nil && rest.isEmpty }
 
     /// Steuerbefehl einreihen. Gibt es die Art schon, wird nur der Inhalt ersetzt (Platz in der Reihe bleibt).
     mutating func control(_ key: String, _ bytes: [UInt8]) {
@@ -36,11 +42,16 @@ struct SendQueue {
             lastSent = nil
             return ctrl.removeFirst().bytes
         }
+        if !rest.isEmpty { return rest.removeFirst() }
         guard let f = frame else { return nil }
         frame = nil
         if f == lastSent { return nil }          // gleiche Farbe nicht doppelt schicken
         lastSent = f
-        return encode(f)
+        var packets = encode(f)
+        guard !packets.isEmpty else { return nil }
+        let first = packets.removeFirst()
+        rest = packets
+        return first
     }
 
     /// Nach einer neuen Verbindung: die erste Farbe auf jeden Fall senden
@@ -51,5 +62,6 @@ struct SendQueue {
     mutating func clear() {
         ctrl.removeAll()
         frame = nil
+        rest.removeAll()
     }
 }

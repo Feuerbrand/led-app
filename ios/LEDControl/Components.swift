@@ -21,6 +21,28 @@ struct Page<Content: View>: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .overlay(alignment: .top) { StatusBarShade() }
+    }
+}
+
+/// Weicher, dunkler Streifen hinter Uhrzeit und Akku: Inhalt, der nach oben geschoben wird,
+/// verschwindet darunter, statt sich mit der Statusleiste zu überlagern.
+private struct StatusBarShade: View {
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Theme.bg.opacity(0.55))
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                             .init(color: .black, location: 0.72),
+                                             .init(color: .clear, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(height: geo.safeAreaInsets.top + 14)
+                .frame(maxWidth: .infinity)
+        }
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
