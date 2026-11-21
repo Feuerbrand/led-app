@@ -23,8 +23,11 @@ struct HomeView: View {
             if !filled {
                 EmptyHome(adding: $adding).rise(2)
             } else {
-                LightList(lights: mine)
+                ClaudeCard()
                     .padding(.top, 20)
+                    .rise(2)
+                LightList(lights: mine)
+                    .padding(.top, 12)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -36,7 +39,10 @@ struct HomeView: View {
         .sheet(isPresented: $adding) {
             AddLightSheet()
         }
-        .onAppear { light.select(.all) }
+        .onAppear {
+            light.select(.all)
+            ClaudeMode.shared.restore()
+        }
         .onChange(of: nav.addLight, initial: true) { _, wanted in
             if wanted {
                 nav.addLight = false
@@ -142,6 +148,118 @@ private struct HomeGlow: View {
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.8), value: tint?.hex ?? "")
             .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Claude-Modus
+
+/// Karte im Hauptmenü: Schalter für den Claude-Modus, Zustand, die drei Farben und der gefundene PC
+private struct ClaudeCard: View {
+    private let claude = ClaudeMode.shared
+    @State private var editing = false
+    @State private var address = ""
+
+    private var statusText: String {
+        guard claude.enabled else { return "Lichter zeigen, was Claude am PC macht" }
+        switch claude.link {
+        case .off: return "Aus"
+        case .searching: return "Sucht deinen PC im WLAN …"
+        case .lost: return claude.host.isEmpty ? "PC nicht gefunden" : "PC nicht erreichbar"
+        case .connected: return claude.phase.map(ClaudeMode.label) ?? "Verbunden"
+        }
+    }
+
+    var body: some View {
+        let on = claude.enabled
+        let glow: Color = on ? (claude.phase.map { ClaudeMode.color($0).color } ?? Theme.accent) : Color(rgb: 0x24221C)
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(on ? Theme.ink : Theme.muted)
+                    .frame(width: 48, height: 48)
+                    .background(glow, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .shadow(color: on ? glow.opacity(0.6) : .clear, radius: 12)
+                    .animation(.easeInOut(duration: 0.5), value: claude.phase)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Claude-Modus")
+                        .font(.geist(18, 700))
+                        .foregroundStyle(Theme.text)
+                    Text(statusText)
+                        .font(.geist(14, 500))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                        .animation(.snappy(duration: 0.2), value: statusText)
+                }
+                Spacer(minLength: 4)
+                Toggle("Claude-Modus", isOn: Binding(get: { claude.enabled }, set: { claude.setEnabled($0) }))
+                    .labelsHidden()
+                    .tint(Theme.accent)
+                    .accessibilityIdentifier("claude-modus")
+            }
+            if on {
+                HStack(spacing: 14) {
+                    legend(.working, "Arbeitet")
+                    legend(.done, "Fertig")
+                    legend(.waiting, "Wartet")
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 8) {
+                    Text(claude.host.isEmpty ? "PC: wird gesucht" : "PC: \(claude.host)")
+                        .font(.geistMono(12, 500))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    smallButton("Suchen") { Task { await claude.search() } }
+                    smallButton("Adresse") {
+                        address = claude.host
+                        editing = true
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(16)
+        .background {
+            ZStack {
+                Theme.card
+                if on {
+                    LinearGradient(colors: [glow.opacity(0.26), glow.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
+            }
+        }
+        .clipShape(shape)
+        .overlay { shape.strokeBorder(on ? glow.opacity(0.4) : Theme.edge, lineWidth: 1) }
+        .animation(.easeInOut(duration: 0.35), value: on)
+        .alert("Adresse des PCs", isPresented: $editing) {
+            TextField("z. B. 192.168.178.20", text: $address)
+                .keyboardType(.decimalPad)
+            Button("Speichern") { claude.setHost(address) }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Leer lassen, dann sucht die App den PC selbst. Am PC zeigt http://localhost:8796 die Adresse an.")
+        }
+    }
+
+    private func legend(_ p: ClaudeMode.Phase, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(ClaudeMode.color(p).color).frame(width: 9, height: 9)
+            Text(text).font(.geist(13, 600)).foregroundStyle(claude.phase == p ? Theme.text : Theme.muted)
+        }
+    }
+
+    private func smallButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.geist(13, 600))
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(Color.white.opacity(0.08), in: Capsule())
+        }
+        .buttonStyle(PressStyle(scale: 0.94))
     }
 }
 

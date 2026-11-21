@@ -39,6 +39,13 @@
 	<string>Für „Farbe abfotografieren“: Die App misst nur die Farbe in der Bildmitte und speichert nichts.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>LED Controller verbindet sich über Bluetooth mit deinen Lichtern, um Licht, Farbe und Effekte zu steuern.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Für den Claude-Modus sucht die App deinen PC im WLAN und fragt ihn, ob Claude gerade arbeitet, fertig ist oder auf dich wartet.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Für den Musik-Modus hört LED Controller über das Mikrofon mit, wie laut es ist, und lässt die Lichter im Takt leuchten. Es wird nichts aufgenommen oder gespeichert.</string>
 	<key>UIAppFonts</key>

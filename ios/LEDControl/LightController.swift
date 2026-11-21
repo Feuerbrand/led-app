@@ -794,6 +794,12 @@ final class LightController {
     }
 
     /// Sonnenaufgang auf allen Lichtern: langsam von dunklem Rot bis Warmweiß, danach bleibt es hell
+    /// Claude-Modus: alle Lichter sanft in diese Farbe (Orange arbeitet, Grün fertig, Weiß wartet)
+    func showStatus(_ c: RGB) {
+        cancelGoodnight()
+        applyColor(c, .all, instant: false)
+    }
+
     func startSunrise(seconds: Double = 90, for t: Target = .all) {
         cancelGoodnight()
         if t == target {
