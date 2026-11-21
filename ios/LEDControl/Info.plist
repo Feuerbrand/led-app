@@ -46,6 +46,11 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>bluetooth-central</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Für den Musik-Modus hört LED Controller über das Mikrofon mit, wie laut es ist, und lässt die Lichter im Takt leuchten. Es wird nichts aufgenommen oder gespeichert.</string>
 	<key>UIAppFonts</key>

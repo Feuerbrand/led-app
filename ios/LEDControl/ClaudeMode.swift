@@ -1,3 +1,4 @@
+import AVFoundation
 import Darwin
 import Foundation
 import Observation
@@ -7,7 +8,8 @@ import UIKit
 /// Am PC meldet ein kleiner Dienst („claude-light“, Port 8796) den Zustand. Die App fragt ihn jede Sekunde
 /// im WLAN ab und färbt alle Lichter: Orange = Claude arbeitet, Grün = fertig, Weiß = wartet auf deine Antwort.
 /// Den PC findet die App selbst (fragt alle Adressen im eigenen WLAN); die Adresse lässt sich auch eintippen.
-/// Läuft, solange die App offen ist; der Bildschirm bleibt dabei an.
+/// Läuft auch im Hintergrund weiter: eine stumme Audio-Wiedergabe (gemischt mit anderer Musik) hält die App wach,
+/// Bluetooth darf im Hintergrund senden (UIBackgroundModes audio + bluetooth-central in Info.plist).
 @Observable
 final class ClaudeMode {
     static let shared = ClaudeMode()
@@ -51,12 +53,12 @@ final class ClaudeMode {
     func setEnabled(_ on: Bool) {
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.onKey)
-        UIApplication.shared.isIdleTimerDisabled = on
         loop?.cancel()
         loop = nil
         phase = nil
         misses = 0
-        guard on else { link = .off; return }
+        guard on else { link = .off; KeepAwake.shared.stop(); return }
+        KeepAwake.shared.start()
         link = host.isEmpty ? .searching : .lost
         loop = Task { @MainActor [weak self] in await self?.run() }
     }
@@ -71,6 +73,8 @@ final class ClaudeMode {
     @MainActor private func run() async {
         if host.isEmpty { await search() }
         while !Task.isCancelled && enabled {
+            // Musik-Modus oder ein Anruf kann die Audio-Sitzung beenden: dann sofort wieder wach halten
+            KeepAwake.shared.ensure()
             if host.isEmpty {
                 link = .lost
                 try? await Task.sleep(for: .seconds(3))
@@ -162,5 +166,67 @@ final class ClaudeMode {
             cursor = entry.ifa_next
         }
         return nil
+    }
+}
+
+/// Hält die App im Hintergrund wach, solange der Claude-Modus an ist: spielt eine stumme Tonspur in Schleife,
+/// gemischt mit anderer Musik (nichts zu hören, andere Apps spielen normal weiter).
+final class KeepAwake {
+    static let shared = KeepAwake()
+    private var player: AVAudioPlayer?
+    private var observers: [NSObjectProtocol] = []
+    private var wanted = false
+
+    func start() {
+        wanted = true
+        if observers.isEmpty {
+            let center = NotificationCenter.default
+            observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+                let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                if raw == AVAudioSession.InterruptionType.ended.rawValue { self?.ensure() }
+            })
+            observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.player = nil
+                self?.ensure()
+            })
+        }
+        ensure()
+    }
+
+    func stop() {
+        wanted = false
+        player?.stop()
+        player = nil
+    }
+
+    /// Spielt die stumme Schleife (oder startet sie neu, falls etwas die Audio-Sitzung beendet hat)
+    func ensure() {
+        guard wanted else { return }
+        let session = AVAudioSession.sharedInstance()
+        // Der Musik-Modus nutzt playAndRecord: dann nur aktiv halten, nicht umstellen
+        if session.category != .playAndRecord {
+            try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        }
+        try? session.setActive(true)
+        if player == nil {
+            player = try? AVAudioPlayer(data: Self.silence(seconds: 2))
+            player?.numberOfLoops = -1
+            player?.volume = 0
+            player?.prepareToPlay()
+        }
+        if player?.isPlaying != true { player?.play() }
+    }
+
+    /// Stille als WAV im Speicher (8 kHz, 16 Bit, mono)
+    private static func silence(seconds: Int) -> Data {
+        let rate = 8000, samples = rate * seconds, bytes = samples * 2
+        var d = Data()
+        func u32(_ v: Int) { var x = UInt32(v).littleEndian; withUnsafeBytes(of: &x) { d.append(contentsOf: $0) } }
+        func u16(_ v: Int) { var x = UInt16(v).littleEndian; withUnsafeBytes(of: &x) { d.append(contentsOf: $0) } }
+        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + bytes); d.append(contentsOf: Array("WAVE".utf8))
+        d.append(contentsOf: Array("fmt ".utf8)); u32(16); u16(1); u16(1); u32(rate); u32(rate * 2); u16(2); u16(16)
+        d.append(contentsOf: Array("data".utf8)); u32(bytes)
+        d.append(Data(count: bytes))
+        return d
     }
 }
